@@ -1,0 +1,76 @@
+import {useState, useEffect, useRef, useMemo, useCallback} from "react";
+import {createPortal} from "react-dom";
+import {motion, AnimatePresence} from "framer-motion";
+import {Link, useNavigate, useLocation} from "react-router-dom";
+import {useCartWishlist, getToken} from "../../../components/cartcontext";
+import {useCurrency} from "../../../components/currencycontext";
+import {Country, State, City} from "country-state-city";
+import logo from "../../../assets/logo.png";
+import {useFlutterwave, closePaymentModal} from "flutterwave-react-v3";
+import PhoneInput from "../../../components/phoneinput";
+
+const API_BASE = import.meta.env.VITE_API_URL ?? "https://blvckmrktng.com";
+
+const STEPS = ["Contact", "Delivery", "Payment", "Review"];
+
+const paymentMethods = [
+  {id: "card", label: "Credit / Debit Card", icon: "💳", description: "Powered by Paystack"},
+  {id: "flutterwave", label: "Flutterwave", icon: "🦋", description: "Mobile Money, Bank & More"},
+  {id: "transfer", label: "Bank Transfer", icon: "🏦", description: "Manual Transfer"},
+];
+
+// ✅ Helper to load Paystack script manually
+const loadPaystackScript = () => {
+  return new Promise((resolve, reject) => {
+    if (window.PaystackPop) {
+      resolve(window.PaystackPop);
+      return;
+    }
+    
+    const script = document.createElement('script');
+    script.src = 'https://js.paystack.co/v1/inline.js';
+    script.onload = () => resolve(window.PaystackPop);
+    script.onerror = reject;
+    document.body.appendChild(script);
+  });
+};
+
+// ─── Portal dropdown ──────────────────────────────────────────────────────────
+function SearchSelect({options, value, onChange, placeholder, disabled}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const triggerRef = useRef(null);
+  const dropdownRef = useRef(null);
+  const [coords, setCoords] = useState({top: 0, left: 0, width: 0});
+
+  const selected = useMemo(() => options.find((o) => o.value === value), [options, value]);
+
+  const filtered = useMemo(() => {
+    if (!query.trim()) return options.slice(0, 250);
+    const q = query.toLowerCase();
+    return options.filter((o) => o.label.toLowerCase().includes(q)).slice(0, 250);
+  }, [options, query]);
+
+  const syncCoords = useCallback(() => {
+    if (!triggerRef.current) return;
+    const r = triggerRef.current.getBoundingClientRect();
+    if (r.bottom < 0 || r.top > window.innerHeight) {
+      setOpen(false);
+      return;
+    }
+    setCoords({top: r.bottom + 6, left: r.left, width: r.width});
+  }, []);
+
+  const openDropdown = useCallback(() => {
+    if (disabled || !triggerRef.current) return;
+    syncCoords();
+    setOpen(true);
+  }, [disabled, syncCoords]);
+
+  useEffect(() => {
+    if (!open) return;
+    window.addEventListener("scroll", syncCoords, {passive: true, capture: true});
+    window.addEventListener("resize", syncCoords, {passive: true});
+    return () => {
+      window.removeEventListener("scroll", syncCoords, {capture: true});
+      window.removeEventListener("resize", syncCoords);

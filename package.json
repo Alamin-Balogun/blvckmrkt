@@ -1,0 +1,12 @@
+{
+  "dependencies": {
+    "@cloudinary/react": "^1.14.4",
+    "@cloudinary/url-gen": "^1.22.0",
+    "country-state-city": "^3.2.1",
+    "framer-motion": "^12.34.3",
+    "react-router-dom": "^7.13.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.2.0"
+  }
+}

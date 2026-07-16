@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(go build *)",
+      "Bash(npx eslint *)",
+      "Bash(git --version)",
+      "Read(//usr/lib/**)",
+      "Bash(apt list *)",
+      "Bash(apt-get install *)",
+      "Bash(dnf install *)",
+      "Bash(gh --version)",
+      "Bash(systemctl list-units *)",
+      "Bash(git init *)",
+      "Bash(git config *)",
+      "Bash(git add *)"
+    ]
+  }
+}
