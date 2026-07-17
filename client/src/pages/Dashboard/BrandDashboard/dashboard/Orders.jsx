@@ -655,8 +655,13 @@ function IncomingOrders() {
     </div>
   ) : order.delivery_address ? (
     <div>
-      <p style={{color: "#fff", fontSize: 12, fontWeight: 700, margin: "0 0 3px"}}>
-        {[order.delivery_address.city, order.delivery_address.state, order.delivery_address.country].filter(Boolean).join(", ")}
+      {(order.delivery_address.line1 || order.delivery_address.line2) && (
+        <p style={{color: "#fff", fontSize: 12, fontWeight: 700, margin: "0 0 3px"}}>
+          {[order.delivery_address.line1, order.delivery_address.line2].filter(Boolean).join(", ")}
+        </p>
+      )}
+      <p style={{color: order.delivery_address.line1 ? "rgba(255,255,255,0.5)" : "#fff", fontSize: order.delivery_address.line1 ? 11 : 12, fontWeight: order.delivery_address.line1 ? 400 : 700, margin: "0 0 3px"}}>
+        {[order.delivery_address.city, order.delivery_address.state, order.delivery_address.postcode, order.delivery_address.country].filter(Boolean).join(", ")}
       </p>
       {order.delivery_address.method_name && (
         <p style={{color: "rgba(255,255,255,0.45)", fontSize: 11, margin: "0 0 2px"}}>

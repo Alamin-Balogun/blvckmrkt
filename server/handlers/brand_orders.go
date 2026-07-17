@@ -32,6 +32,13 @@ type BrandOrderResponse struct {
 }
 
 type DeliveryAddressInfo struct {
+	// Line1/Line2/Postcode come from the order's actual saved Address row —
+	// the zone/local delivery snapshot tables only ever stored country/state/
+	// city, which isn't enough to actually ship a package. Brands need the
+	// street-level address, not just the region.
+	Line1      string `json:"line1,omitempty"`
+	Line2      string `json:"line2,omitempty"`
+	Postcode   string `json:"postcode,omitempty"`
 	Country    string `json:"country"`
 	State      string `json:"state"`
 	City       string `json:"city"`
@@ -173,6 +180,23 @@ func BrandListOrders(c *gin.Context) {
 		localMap[l.OrderID] = l
 	}
 
+	// Batch-fetch the actual saved Address rows for street-level detail —
+	// the zone/local snapshot tables above only have country/state/city.
+	var addrIDs []uint
+	for _, o := range orders {
+		if o.AddressID != nil {
+			addrIDs = append(addrIDs, *o.AddressID)
+		}
+	}
+	addrMap := map[uint]models.Address{}
+	if len(addrIDs) > 0 {
+		var addrs []models.Address
+		database.DB.Where("id IN ?", addrIDs).Find(&addrs)
+		for _, a := range addrs {
+			addrMap[a.ID] = a
+		}
+	}
+
 	var userIDs []uint
 	for _, o := range orders {
 		if o.UserID != nil {
@@ -241,6 +265,12 @@ func BrandListOrders(c *gin.Context) {
 			ContactEmail:  o.ContactEmail,
 		}
 
+		var streetAddr models.Address
+		var hasStreetAddr bool
+		if o.AddressID != nil {
+			streetAddr, hasStreetAddr = addrMap[*o.AddressID]
+		}
+
 		switch deliveryTypeMap[o.ID] {
 		case "pickup":
 			if p, ok := pickupMap[o.ID]; ok {
@@ -263,6 +293,12 @@ func BrandListOrders(c *gin.Context) {
 					MinDays:    z.MinDays,
 					MaxDays:    z.MaxDays,
 				}
+				if hasStreetAddr {
+					row.DeliveryAddress.Line1 = streetAddr.Line1
+					row.DeliveryAddress.Line2 = streetAddr.Line2
+					row.DeliveryAddress.Postcode = streetAddr.Postcode
+					row.DeliveryAddress.City = streetAddr.City
+				}
 			}
 		case "local":
 			if l, ok := localMap[o.ID]; ok {
@@ -270,6 +306,11 @@ func BrandListOrders(c *gin.Context) {
 					Country: l.Country,
 					State:   l.State,
 					City:    l.City,
+				}
+				if hasStreetAddr {
+					row.DeliveryAddress.Line1 = streetAddr.Line1
+					row.DeliveryAddress.Line2 = streetAddr.Line2
+					row.DeliveryAddress.Postcode = streetAddr.Postcode
 				}
 			}
 		}
