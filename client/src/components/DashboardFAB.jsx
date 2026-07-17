@@ -32,7 +32,7 @@ export default function DashboardFAB() {
       title={isDashboard ? "Back to website" : user ? "Go to dashboard" : "Login"}
       style={{
         position: "fixed",
-        bottom: 28,
+        top: 224, // clears the fixed navbar (marquee + nav bar) at its tallest, unscrolled state
         right: 28,
         zIndex: 9000,
         width: 52,

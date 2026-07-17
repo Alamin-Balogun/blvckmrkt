@@ -214,11 +214,7 @@ export default function Navbar() {
 
           {/* Right Icons — desktop */}
           <div className="hidden md:flex items-center gap-6 ml-auto">
-            <Link
-              to="/brands"
-              className={`text-[11px] font-bold tracking-[0.2em] uppercase px-4 py-2 transition-all duration-200 ${isActive("/sell") ? "bg-red-500 text-white" : "bg-white text-black hover:bg-red-500 hover:text-white"}`}>
-              BRANDS
-            </Link>
+            {/* User/account icon moved to the front of the icon cluster */}
             <Link
               to="/signup"
               className={`relative transition-colors ${isActive("/signup") ? "text-red-500" : "text-white/60 hover:text-white"}`}>
@@ -238,6 +234,11 @@ export default function Navbar() {
                   d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
                 />
               </motion.svg>
+            </Link>
+            <Link
+              to="/brands"
+              className={`text-[11px] font-bold tracking-[0.2em] uppercase px-4 py-2 transition-all duration-200 ${isActive("/sell") ? "bg-red-500 text-white" : "bg-white text-black hover:bg-red-500 hover:text-white"}`}>
+              BRANDS
             </Link>
             <Link
               to="/wishlist"
@@ -419,6 +420,18 @@ export default function Navbar() {
                   className="grid grid-cols-3 gap-6">
                   {[
                     {
+                      to: "/signup",
+                      label: "Account",
+                      icon: (
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                        />
+                      ),
+                      badge: false,
+                    },
+                    {
                       to: "/wishlist",
                       label: "Wishlist",
                       icon: (
@@ -441,18 +454,6 @@ export default function Navbar() {
                         />
                       ),
                       badge: true,
-                    },
-                    {
-                      to: "/signup",
-                      label: "Account",
-                      icon: (
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                        />
-                      ),
-                      badge: false,
                     },
                   ].map(({to, label, icon, badge}) => (
                     <Link
