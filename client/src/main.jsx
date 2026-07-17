@@ -33,6 +33,7 @@ const Contact                = lazy(() => import("./pages/Contact/Contact"));
 const Blog                   = lazy(() => import("./pages/Blog/Blog"));
 const BlogPost               = lazy(() => import("./pages/Blog/blog_components/blogpost"));
 const Brands                 = lazy(() => import("./pages/Brands/Brands"));
+const BrandProfile           = lazy(() => import("./pages/Brands/BrandProfile"));
 const Drops                  = lazy(() => import("./pages/Drops/Drops"));
 const Detail                 = lazy(() => import("./pages/Detail/Detail"));
 const Checkout               = lazy(() => import("./pages/Checkout/Checkout"));
@@ -113,6 +114,7 @@ createRoot(document.getElementById("root")).render(
                 <Route path="/blog"                      element={<Blog />} />
                 <Route path="/blog/:slug"                element={<BlogPost />} />
                 <Route path="/brands"                    element={<Brands />} />
+                <Route path="/brands/:slug"              element={<BrandProfile />} />
                 <Route path="/drops"                     element={<Drops />} />
                 <Route path="/sell"                      element={<Sell />} />
                 {/* Auth */}

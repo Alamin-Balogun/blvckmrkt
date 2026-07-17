@@ -53,6 +53,7 @@ func Register(r *gin.Engine) {
 
 	// ── Public brands page ─────────────────────────────────────────────────────
 	api.GET("/brands", handlers.GetPublicBrands)
+	api.GET("/brands/:slug", handlers.GetPublicBrandBySlug)
 
 	// ── Public drops ───────────────────────────────────────────────────────────
 	api.GET("/drops", handlers.GetPublicDrops)

@@ -1,7 +1,7 @@
 import {useState, useEffect} from "react";
 import {useBrandsContent} from "./brandscontentcontext";
 import {motion, AnimatePresence} from "framer-motion";
-import {Link} from "react-router-dom";
+import {Link, useNavigate} from "react-router-dom";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "https://blvckmrktng.com";
 
@@ -139,12 +139,16 @@ function FeaturedCard({brand, i, shopBtnText, dropsAvailLabel}) {
   const location = brandLocation(brand);
   const hasLogo = !!brand.logo_url;
   const hasBanner = !!brand.banner_url;
+  const navigate = useNavigate();
+  const goToProfile = () => brand.slug && navigate(`/brands/${brand.slug}`);
 
   return (
     <motion.div
       initial={{opacity: 0, y: 24}}
       animate={{opacity: 1, y: 0}}
       transition={{duration: 0.45, delay: i * 0.09}}
+      onClick={goToProfile}
+      style={{cursor: brand.slug ? "pointer" : "default"}}
       className="brand-feat-card">
       {/* Background — banner if exists, otherwise dark gradient */}
       <div className="brand-feat-img">
@@ -222,7 +226,7 @@ function FeaturedCard({brand, i, shopBtnText, dropsAvailLabel}) {
               {brand.product_count ?? 0} {dropsAvailLabel}
             </span>
           </div>
-          <Link to={"/shop?brand_id=" + brand.id} className="brand-feat-cta">
+          <Link to={"/shop?brand_id=" + brand.id} className="brand-feat-cta" onClick={(e) => e.stopPropagation()}>
             {shopBtnText}
             <svg
               width="10"
@@ -245,12 +249,16 @@ function BrandCard({brand, i, shopBtnText, dropsLabel}) {
   const location = brandLocation(brand);
   const hasBanner = !!brand.banner_url;
   const hasLogo = !!brand.logo_url;
+  const navigate = useNavigate();
+  const goToProfile = () => brand.slug && navigate(`/brands/${brand.slug}`);
 
   return (
     <motion.div
       initial={{opacity: 0, y: 20}}
       animate={{opacity: 1, y: 0}}
       transition={{duration: 0.35, delay: i * 0.04}}
+      onClick={goToProfile}
+      style={{cursor: brand.slug ? "pointer" : "default"}}
       className="brand-card">
       {hasBanner ? (
         <>
@@ -370,7 +378,7 @@ function BrandCard({brand, i, shopBtnText, dropsLabel}) {
               {brand.product_count ?? 0} {dropsLabel}
             </div>
           </div>
-          <Link to={"/shop?brand_id=" + brand.id} className="brand-card-shop">
+          <Link to={"/shop?brand_id=" + brand.id} className="brand-card-shop" onClick={(e) => e.stopPropagation()}>
             {shopBtnText}
             <svg
               width="9"

@@ -280,6 +280,7 @@ func GetProduct(c *gin.Context) {
 		"tags":          product.Tags,
 		"brand_id":      product.BrandID,
 		"brand_name":    brand.BrandName,
+		"brand_slug":    brand.Slug,
 		"category_id":   product.CategoryID,
 		"category_name": categoryName,
 		"primary_image": primaryImage,
@@ -419,13 +420,15 @@ func GetShopCounts(c *gin.Context) {
 // ── GET /api/shop/brands ──────────────────────────────────────────────────────
 func ListBrands(c *gin.Context) {
 	type ShopBrand struct {
-		ID           uint   `json:"id"`
-		DisplayID    string `json:"display_id"`
-		BrandName    string `json:"brand_name"`
-		Slug         string `json:"slug"`
-		LogoURL      string `json:"logo_url"`
-		Category     string `json:"category"`
-		ProductCount int    `json:"product_count"`
+		ID                 uint   `json:"id"`
+		DisplayID          string `json:"display_id"`
+		BrandName          string `json:"brand_name"`
+		Slug               string `json:"slug"`
+		LogoURL            string `json:"logo_url"`
+		Category           string `json:"category"`
+		ProductCount       int    `json:"product_count"`
+		VerificationStatus string `json:"verification_status"`
+		IsExclusive        bool   `json:"is_exclusive"`
 	}
 
 	var brands []ShopBrand
@@ -437,7 +440,9 @@ func ListBrands(c *gin.Context) {
 			b.slug,
 			COALESCE(b.logo_url, '')  AS logo_url,
 			COALESCE(b.category, '')  AS category,
-			COUNT(DISTINCT p.id)      AS product_count
+			COUNT(DISTINCT p.id)      AS product_count,
+			b.verification_status     AS verification_status,
+			b.is_exclusive            AS is_exclusive
 		FROM brands b
 		LEFT JOIN products p
 			ON  p.brand_id   = b.id
@@ -446,8 +451,12 @@ func ListBrands(c *gin.Context) {
 		WHERE b.deleted_at          IS NULL
 		  AND b.verification_status  = 'verified'
 		  AND b.subscription_status IN ('active', 'trial')
-		GROUP BY b.id, b.display_id, b.brand_name, b.slug, b.logo_url, b.category
-		ORDER BY b.brand_name ASC
+		GROUP BY b.id, b.display_id, b.brand_name, b.slug, b.logo_url, b.category,
+			b.verification_status, b.is_exclusive, b.featured_rank
+		ORDER BY
+			CASE WHEN b.featured_rank IS NULL THEN 1 ELSE 0 END ASC,
+			b.featured_rank ASC,
+			b.brand_name ASC
 	`).Scan(&brands)
 
 	if brands == nil {

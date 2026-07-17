@@ -604,7 +604,13 @@ const handleBuyNow = () => {
             transition={{duration: 0.5, delay: 0.1}}
             className="pd-info">
             <div className="pd-brand-row">
-              <span className="pd-brand-tag">{product.brand_name}</span>
+              {product.brand_slug ? (
+                <Link to={`/brands/${product.brand_slug}`} className="pd-brand-tag" style={{textDecoration: "none"}}>
+                  {product.brand_name}
+                </Link>
+              ) : (
+                <span className="pd-brand-tag">{product.brand_name}</span>
+              )}
               <div className="pd-verified">
                 <svg
                   width="8"

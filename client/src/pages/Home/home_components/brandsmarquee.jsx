@@ -55,7 +55,7 @@ function LogoCard({brand}) {
 
   const handleClick = (e) => {
     e.preventDefault();
-    navigate(`/shop?brand_id=${brand.id}`);
+    navigate(brand.slug ? `/brands/${brand.slug}` : `/shop?brand_id=${brand.id}`);
   };
 
   return (

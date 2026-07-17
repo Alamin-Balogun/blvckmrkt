@@ -38,6 +38,14 @@ type Brand struct {
 	// ✅ Custom commission rate (NULL = use platform default)
 	CommissionRate *float64 `gorm:"type:decimal(5,2);default:null" json:"commission_rate,omitempty"`
 
+	// ✅ Discovery — admin-controlled placement
+	// IsExclusive puts the brand in the storefront's "Exclusive Brands" section.
+	// FeaturedRank pins a brand's position in the "top brands" rail — lower
+	// sorts first; NULL means not manually pinned (falls back to the existing
+	// subscription-based sort).
+	IsExclusive  bool `gorm:"default:false" json:"is_exclusive"`
+	FeaturedRank *int `gorm:"default:null"  json:"featured_rank,omitempty"`
+
 	// ✅ Partnership agreement
 	PartnershipSigned   bool       `gorm:"default:false"  json:"partnership_signed"`
 	PartnershipSignedAt *time.Time `gorm:"default:null"   json:"partnership_signed_at,omitempty"`

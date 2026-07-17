@@ -120,6 +120,8 @@ func AdminUpdateBrand(c *gin.Context) {
 		"phone":               true,
 		"verification_status": true,
 		"commission_rate":     true, // ✅ now allowed
+		"is_exclusive":        true,
+		"featured_rank":       true,
 	}
 
 	updates := map[string]interface{}{}
@@ -147,6 +149,24 @@ func AdminUpdateBrand(c *gin.Context) {
 				updates["commission_rate"] = n
 			default:
 				utils.BadRequest(c, "Invalid commission_rate value", nil)
+				return
+			}
+			continue
+		}
+
+		// featured_rank: accept null (unpin) or a whole number — JSON numbers
+		// arrive as float64 via map[string]interface{}, so this needs the same
+		// explicit coercion commission_rate does above.
+		if k == "featured_rank" {
+			if v == nil || v == "" {
+				updates["featured_rank"] = nil
+				continue
+			}
+			switch n := v.(type) {
+			case float64:
+				updates["featured_rank"] = int(n)
+			default:
+				utils.BadRequest(c, "Invalid featured_rank value", nil)
 				return
 			}
 			continue
