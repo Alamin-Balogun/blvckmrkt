@@ -199,6 +199,24 @@ function ProductModal({
     onSave(body, alreadyInDrop);
   };
 
+  // The size field is meant for ONE size per row, but the "XS, S, M, L, XL…"
+  // placeholder reads like an example of what to type into it, so brands
+  // naturally typed all their sizes into a single row as one comma-separated
+  // string instead of using "+ Add Size" per size. Auto-split that back into
+  // separate rows (same stock count on each — brand can adjust after) rather
+  // than silently saving one garbled size.
+  const splitSizeRow = (i) => {
+    setForm((f) => {
+      const row = f.sizes[i];
+      const tokens = row.size.split(/[,/]+/).map((s) => s.trim()).filter(Boolean);
+      if (tokens.length <= 1) return f;
+      const expanded = tokens.map((size) => ({size, stock: row.stock}));
+      const sizes = [...f.sizes];
+      sizes.splice(i, 1, ...expanded);
+      return {...f, sizes};
+    });
+  };
+
   return (
     <div
       style={{
@@ -664,8 +682,8 @@ function ProductModal({
                   }
                   style={inp}
                   onFocus={focus}
-                  onBlur={blur}
-                  placeholder="XS, S, M, L, XL…"
+                  onBlur={(e) => { blur(e); splitSizeRow(i); }}
+                  placeholder="One size per row, e.g. M"
                 />
                 <input
                   type="number"
