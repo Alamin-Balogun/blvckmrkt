@@ -137,6 +137,66 @@ func sendOrderConfirmationEmail(order models.Order, firstName, email string) {
 	} else {
 		log.Printf("📧 Order confirmation email sent for %s to %s", order.DisplayID, email)
 	}
+
+	notifyBrandsOfOrder(order, firstName)
+}
+
+// notifyBrandsOfOrder emails each brand with items in the order — scoped to
+// only that brand's items and their share of the total, since one order can
+// span multiple brands and each should only see their own line items.
+func notifyBrandsOfOrder(order models.Order, buyerFirstName string) {
+	itemsByBrand := map[uint][]models.OrderItem{}
+	var brandOrder []uint
+	for _, item := range order.Items {
+		if _, seen := itemsByBrand[item.BrandID]; !seen {
+			brandOrder = append(brandOrder, item.BrandID)
+		}
+		itemsByBrand[item.BrandID] = append(itemsByBrand[item.BrandID], item)
+	}
+
+	for _, brandID := range brandOrder {
+		items := itemsByBrand[brandID]
+
+		var brand models.Brand
+		if err := database.DB.First(&brand, brandID).Error; err != nil {
+			log.Printf("⚠️ Brand notification skipped — brand %d not found for order %s", brandID, order.DisplayID)
+			continue
+		}
+		var brandUser models.User
+		if err := database.DB.Select("email").First(&brandUser, brand.UserID).Error; err != nil || brandUser.Email == "" {
+			log.Printf("⚠️ Brand notification skipped — no email for brand %d (order %s)", brandID, order.DisplayID)
+			continue
+		}
+
+		emailItems := make([]utils.OrderConfirmationItem, len(items))
+		var brandTotal float64
+		for i, item := range items {
+			emailItems[i] = utils.OrderConfirmationItem{
+				Name:      item.ProductName,
+				Size:      item.Size,
+				Quantity:  item.Quantity,
+				UnitPrice: item.UnitPrice,
+				Total:     item.TotalPrice,
+				ImageURL:  item.ImageURL,
+			}
+			brandTotal += item.TotalPrice
+		}
+
+		err := utils.SendBrandOrderNotificationEmail(utils.BrandOrderNotificationData{
+			BrandName:  brand.BrandName,
+			BrandEmail: brandUser.Email,
+			OrderID:    order.DisplayID,
+			BuyerName:  buyerFirstName,
+			Currency:   order.Currency,
+			BrandTotal: brandTotal,
+			Items:      emailItems,
+		})
+		if err != nil {
+			log.Printf("⚠️ Brand order notification failed for brand %d, order %s: %v", brandID, order.DisplayID, err)
+		} else {
+			log.Printf("📧 Brand order notification sent to %s for order %s", brandUser.Email, order.DisplayID)
+		}
+	}
 }
 
 // ── Main handler ───────────────────────────────────────────────────────────────

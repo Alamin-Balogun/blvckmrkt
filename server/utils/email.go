@@ -488,6 +488,166 @@ func imageTag(url string) string {
 	return fmt.Sprintf(`<img src="%s" width="44" height="44" style="display:block;width:44px;height:44px;object-fit:cover;border-radius:6px;" alt="">`, url)
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Brand New-Order Notification Email
+// ─────────────────────────────────────────────────────────────────────────────
+
+// BrandOrderNotificationData holds everything needed to tell a brand that a
+// buyer just purchased their product(s). Sent per-brand, scoped to only the
+// items in the order that belong to that brand — an order can span multiple
+// brands, and each brand should only see (and be notified about) their own
+// items, not the whole order.
+type BrandOrderNotificationData struct {
+	BrandName  string
+	BrandEmail string
+	OrderID    string
+	BuyerName  string
+	Currency   string
+	BrandTotal float64
+	Items      []OrderConfirmationItem
+}
+
+// SendBrandOrderNotificationEmail notifies a brand that a new order containing
+// their product(s) has been placed.
+func SendBrandOrderNotificationEmail(d BrandOrderNotificationData) error {
+	apiKey := os.Getenv("RESEND_API_KEY")
+	if apiKey == "" {
+		return fmt.Errorf("RESEND_API_KEY not set")
+	}
+
+	client := resend.NewClient(apiKey)
+	from := fmt.Sprintf("%s <%s>", config.App.EmailFromName, config.App.EmailFrom)
+
+	params := &resend.SendEmailRequest{
+		From:    from,
+		To:      []string{d.BrandEmail},
+		Subject: fmt.Sprintf("🛍️ New order – %s", d.OrderID),
+		Html:    buildBrandOrderNotificationEmail(d),
+	}
+
+	_, err := client.Emails.Send(params)
+	if err != nil {
+		return fmt.Errorf("resend send failed: %w", err)
+	}
+	return nil
+}
+
+func buildBrandOrderNotificationEmail(d BrandOrderNotificationData) string {
+	currencySymbol := d.Currency
+	if d.Currency == "NGN" {
+		currencySymbol = "₦"
+	}
+
+	itemRows := ""
+	for _, item := range d.Items {
+		sizeLabel := ""
+		if item.Size != "" && item.Size != "—" {
+			sizeLabel = fmt.Sprintf(" · Size %s", item.Size)
+		}
+		itemRows += fmt.Sprintf(`
+		<tr>
+		  <td style="padding:0 0 14px;">
+		    <table width="100%%" cellpadding="0" cellspacing="0"><tr>
+		      <td style="width:44px;vertical-align:top;">%s</td>
+		      <td style="padding-left:12px;vertical-align:top;">
+		        <p style="color:#fff;font-size:13px;margin:0 0 3px;font-weight:600;">%s%s</p>
+		        <p style="color:rgba(255,255,255,0.3);font-size:11px;margin:0;">Qty: %d</p>
+		      </td>
+		      <td style="text-align:right;vertical-align:top;white-space:nowrap;">
+		        <p style="color:#fff;font-size:13px;margin:0;font-weight:600;">%s%.2f</p>
+		      </td>
+		    </tr></table>
+		  </td>
+		</tr>`,
+			imageTag(item.ImageURL),
+			item.Name, sizeLabel,
+			item.Quantity,
+			currencySymbol, item.Total,
+		)
+	}
+
+	return fmt.Sprintf(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>New Order</title>
+</head>
+<body style="margin:0;padding:0;background:#0a0a0a;font-family:system-ui,-apple-system,sans-serif;">
+  <table width="100%%" cellpadding="0" cellspacing="0" style="background:#0a0a0a;padding:40px 20px;">
+    <tr><td align="center">
+      <table width="520" cellpadding="0" cellspacing="0"
+        style="background:#111;border:1px solid rgba(255,255,255,0.08);border-radius:16px;overflow:hidden;max-width:520px;width:100%%;">
+
+        <!-- Header -->
+        <tr><td style="background:#0d0d0d;padding:28px 36px;border-bottom:1px solid rgba(255,255,255,0.06);">
+          <table width="100%%" cellpadding="0" cellspacing="0"><tr>
+            <td>
+              <span style="font-family:Georgia,serif;font-size:22px;font-weight:900;color:#fff;letter-spacing:0.06em;">
+                BLVCK<span style="color:#ef4444;">MRKT</span>
+              </span>
+            </td>
+            <td align="right">
+              <span style="background:rgba(239,68,68,0.15);color:#ef4444;font-size:10px;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;padding:5px 12px;border-radius:20px;border:1px solid rgba(239,68,68,0.3);">
+                New Order
+              </span>
+            </td>
+          </tr></table>
+        </td></tr>
+
+        <!-- Body -->
+        <tr><td style="padding:36px 36px 28px;">
+
+          <p style="color:rgba(255,255,255,0.4);font-size:11px;font-weight:700;letter-spacing:0.3em;text-transform:uppercase;margin:0 0 12px;">
+            Order Notification
+          </p>
+          <h1 style="color:#fff;font-size:24px;margin:0 0 10px;line-height:1.3;">
+            You've got a sale, %s! 🎉
+          </h1>
+          <p style="color:rgba(255,255,255,0.45);font-size:13px;line-height:1.7;margin:0 0 24px;">
+            %s just purchased from your storefront on BLVCKMRKT. Order
+            <strong style="color:#fff;">%s</strong>.
+          </p>
+
+          <!-- Items -->
+          <table width="100%%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;">
+            %s
+          </table>
+
+          <!-- Total -->
+          <div style="background:#0a0a0a;border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:16px 20px;margin-bottom:24px;">
+            <table width="100%%" cellpadding="0" cellspacing="0"><tr>
+              <td style="color:rgba(255,255,255,0.4);font-size:12px;">Your Total</td>
+              <td align="right" style="color:#ef4444;font-size:16px;font-weight:900;">%s%.2f</td>
+            </tr></table>
+          </div>
+
+          <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:14px 18px;">
+            <p style="color:rgba(255,255,255,0.3);font-size:12px;margin:0;line-height:1.6;">
+              📦 Log in to your Brand Studio dashboard to view fulfilment details and update the order status.
+            </p>
+          </div>
+
+        </td></tr>
+
+        <!-- Footer -->
+        <tr><td style="background:#0d0d0d;padding:20px 36px;border-top:1px solid rgba(255,255,255,0.06);">
+          <p style="color:rgba(255,255,255,0.2);font-size:11px;margin:0;line-height:1.6;">
+            © 2026 BLVCKMRKT &nbsp;·&nbsp; Automated message — please do not reply.
+          </p>
+        </td></tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+		d.BrandName, d.BuyerName, d.OrderID,
+		itemRows,
+		currencySymbol, d.BrandTotal,
+	)
+}
+
 // ── Payout Email ───────────────────────────────────────────────────────────────
 
 // PayoutEmailData holds everything needed to render the payout email.
