@@ -35,6 +35,8 @@ export default function ProductDetail() {
   const [addedToCart, setAddedToCart] = useState(false);
   const [activeTab, setActiveTab] = useState("Description");
   const [zoomOpen, setZoomOpen] = useState(false);
+  const [showSizeGuide, setShowSizeGuide] = useState(false);
+  const [sizeGuideTab, setSizeGuideTab] = useState("tops");
   const [loadingCart, setLoadingCart] = useState(false);
   const [loadingWish, setLoadingWish] = useState(false);
   const cycleRef = useRef(null);
@@ -424,6 +426,18 @@ const handleBuyNow = () => {
         .pd-zoom-overlay img { max-width: 90vw; max-height: 90vh; object-fit: contain; }
         .pd-desc-text { color: rgba(255,255,255,0.5); font-size: 13px; line-height: 1.8; margin: 0; white-space: pre-line; }
         @keyframes pd-pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        .pd-sg-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 24px; }
+        .pd-sg-modal { background: #0d0d0d; border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; max-width: 560px; width: 100%; max-height: 85vh; overflow-y: auto; padding: 28px; }
+        .pd-sg-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+        .pd-sg-title { font-family: 'Bebas Neue', sans-serif; font-size: 1.5rem; letter-spacing: 0.05em; color: #fff; margin: 0; }
+        .pd-sg-close { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: rgba(255,255,255,0.5); width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-size: 13px; }
+        .pd-sg-tabs { display: flex; gap: 8px; margin-bottom: 18px; }
+        .pd-sg-tab { flex: 1; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: rgba(255,255,255,0.4); font-size: 10px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; padding: 9px 0; border-radius: 8px; cursor: pointer; transition: all 0.15s; }
+        .pd-sg-tab.active { background: rgba(239,68,68,0.12); border-color: rgba(239,68,68,0.4); color: #ef4444; }
+        .pd-sg-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        .pd-sg-table th { text-align: left; color: rgba(255,255,255,0.3); font-size: 9px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; padding: 8px 6px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .pd-sg-table td { color: rgba(255,255,255,0.65); padding: 8px 6px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .pd-sg-note { color: rgba(255,255,255,0.3); font-size: 11px; line-height: 1.6; margin-top: 16px; }
       `}</style>
 
       <div className="pd-wrap">
@@ -668,7 +682,7 @@ const handleBuyNow = () => {
                     Select Size{" "}
                     {selectedSize && <span style={{color: "#ef4444"}}>— {selectedSize}</span>}
                   </span>
-                  <button className="pd-size-guide">Size Guide</button>
+                  <button className="pd-size-guide" onClick={() => setShowSizeGuide(true)}>Size Guide</button>
                 </div>
                 <div className="pd-sizes">
                   {sizes.map((s) => {
@@ -1426,6 +1440,112 @@ const handleBuyNow = () => {
               src={images[activeImg]}
               alt={product.name}
             />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Size Guide ── */}
+      <AnimatePresence>
+        {showSizeGuide && (
+          <motion.div
+            initial={{opacity: 0}}
+            animate={{opacity: 1}}
+            exit={{opacity: 0}}
+            className="pd-sg-overlay"
+            onClick={() => setShowSizeGuide(false)}>
+            <motion.div
+              initial={{opacity: 0, y: 12}}
+              animate={{opacity: 1, y: 0}}
+              exit={{opacity: 0, y: 12}}
+              className="pd-sg-modal"
+              onClick={(e) => e.stopPropagation()}>
+              <div className="pd-sg-head">
+                <p className="pd-sg-title">Size Guide</p>
+                <button className="pd-sg-close" onClick={() => setShowSizeGuide(false)}>✕</button>
+              </div>
+
+              <div className="pd-sg-tabs">
+                {[
+                  {key: "tops", label: "Tops"},
+                  {key: "bottoms", label: "Bottoms"},
+                  {key: "shoes", label: "Shoes"},
+                ].map((t) => (
+                  <button
+                    key={t.key}
+                    className={`pd-sg-tab ${sizeGuideTab === t.key ? "active" : ""}`}
+                    onClick={() => setSizeGuideTab(t.key)}>
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+
+              {sizeGuideTab === "tops" && (
+                <table className="pd-sg-table">
+                  <thead>
+                    <tr><th>Size</th><th>Chest (in)</th><th>Chest (cm)</th><th>US</th><th>UK</th></tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      ["XS", "32–34", "81–86", "XS", "6–8"],
+                      ["S", "35–37", "89–94", "S", "8–10"],
+                      ["M", "38–40", "97–102", "M", "10–12"],
+                      ["L", "41–43", "104–109", "L", "12–14"],
+                      ["XL", "44–46", "112–117", "XL", "14–16"],
+                      ["XXL", "47–49", "119–124", "XXL", "16–18"],
+                    ].map((row) => (
+                      <tr key={row[0]}>{row.map((cell, i) => <td key={i}>{cell}</td>)}</tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+
+              {sizeGuideTab === "bottoms" && (
+                <table className="pd-sg-table">
+                  <thead>
+                    <tr><th>Size</th><th>Waist (in)</th><th>Waist (cm)</th><th>US</th><th>UK</th></tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      ["XS", "28–29", "71–74", "26", "6"],
+                      ["S", "30–31", "76–79", "28", "8"],
+                      ["M", "32–33", "81–84", "30", "10"],
+                      ["L", "34–36", "86–91", "32", "12"],
+                      ["XL", "37–39", "94–99", "34", "14"],
+                      ["XXL", "40–42", "102–107", "36", "16"],
+                    ].map((row) => (
+                      <tr key={row[0]}>{row.map((cell, i) => <td key={i}>{cell}</td>)}</tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+
+              {sizeGuideTab === "shoes" && (
+                <table className="pd-sg-table">
+                  <thead>
+                    <tr><th>US</th><th>UK</th><th>EU</th><th>CM</th></tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      ["6", "5.5", "39", "24"],
+                      ["7", "6.5", "40", "25"],
+                      ["8", "7.5", "41", "26"],
+                      ["9", "8.5", "42.5", "27"],
+                      ["10", "9.5", "44", "28"],
+                      ["11", "10.5", "45", "29"],
+                      ["12", "11.5", "46", "30"],
+                    ].map((row) => (
+                      <tr key={row[0]}>{row.map((cell, i) => <td key={i}>{cell}</td>)}</tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+
+              <p className="pd-sg-note">
+                Sizing is a general guide and can vary slightly by brand and cut. If you're between
+                sizes, or unsure, we recommend sizing up — check the product description for any
+                brand-specific fit notes.
+              </p>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
