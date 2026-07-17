@@ -10,9 +10,10 @@ import "time"
 type PaymentIntentStatus string
 
 const (
-	IntentPending   PaymentIntentStatus = "pending"
-	IntentCompleted PaymentIntentStatus = "completed"
-	IntentFailed    PaymentIntentStatus = "failed"
+	IntentPending    PaymentIntentStatus = "pending"
+	IntentProcessing PaymentIntentStatus = "processing" // claimed by a finalizer — see claimIntentOrWait
+	IntentCompleted  PaymentIntentStatus = "completed"
+	IntentFailed     PaymentIntentStatus = "failed"
 )
 
 type PaymentIntent struct {

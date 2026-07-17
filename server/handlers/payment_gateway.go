@@ -224,14 +224,61 @@ func InitiateFlutterwavePayment(c *gin.Context) {
 	utils.OK(c, "Payment link created", gin.H{"link": link, "tx_ref": txRef})
 }
 
+// claimIntentOrWait atomically flips a PENDING PaymentIntent to PROCESSING so
+// only one caller actually verifies the payment and builds the order. The
+// frontend's /payment/callback finalize call and the gateway's server-to-server
+// webhook can both arrive for the same tx_ref within milliseconds of each
+// other, and a plain "if intent.Status == Completed" read-check in each
+// caller (what this used to rely on) doesn't stop both from passing that
+// check before either has written anything — the actual DB write only
+// happens after a slow outbound payment-verification call, which is exactly
+// the window the race lands in. That produced duplicate orders, duplicate
+// stock decrements, and duplicate confirmation emails.
+//
+// If this caller loses the claim, it polls briefly for the winner to finish
+// and returns that result instead of finalizing a second time.
+func claimIntentOrWait(intent *models.PaymentIntent) (order models.Order, handled bool, err error) {
+	res := database.DB.Model(&models.PaymentIntent{}).
+		Where("id = ? AND status = ?", intent.ID, models.IntentPending).
+		Update("status", models.IntentProcessing)
+
+	if res.RowsAffected == 1 {
+		intent.Status = models.IntentProcessing
+		return models.Order{}, false, nil // won the claim — caller proceeds to finalize
+	}
+
+	for i := 0; i < 10; i++ {
+		time.Sleep(300 * time.Millisecond)
+		var fresh models.PaymentIntent
+		if dbErr := database.DB.First(&fresh, intent.ID).Error; dbErr != nil {
+			return models.Order{}, true, fmt.Errorf("failed to check payment status")
+		}
+		if fresh.Status == models.IntentCompleted {
+			var finishedOrder models.Order
+			if fresh.OrderID != nil {
+				database.DB.Preload("Items").First(&finishedOrder, *fresh.OrderID)
+			}
+			return finishedOrder, true, nil
+		}
+		if fresh.Status == models.IntentFailed {
+			return models.Order{}, true, fmt.Errorf("Payment failed%s", condSuffix(fresh.FailureReason))
+		}
+	}
+	return models.Order{}, true, fmt.Errorf("Payment is still being processed — please check back in a moment")
+}
+
 // finalizeFlutterwaveIntent verifies a Flutterwave charge and builds the real
 // order for a pending PaymentIntent. Shared by the frontend-triggered finalize
-// endpoint (below) and the FlutterwaveWebhook safety net in webhooks.go, so
-// whichever one fires first creates the order and the other just no-ops
-// against the now-completed intent.
+// endpoint (below) and the FlutterwaveWebhook safety net in webhooks.go —
+// claimIntentOrWait above ensures whichever one arrives first is the only one
+// that actually builds the order.
 func finalizeFlutterwaveIntent(intent *models.PaymentIntent, transactionID string) (models.Order, error) {
 	if transactionID == "" {
 		return models.Order{}, fmt.Errorf("missing transaction id")
+	}
+
+	if order, handled, claimErr := claimIntentOrWait(intent); handled {
+		return order, claimErr
 	}
 
 	verification, err := utils.VerifyFlutterwavePayment(transactionID)
@@ -485,10 +532,15 @@ func createPaystackPaymentLink(reference string, amount float64, currency, email
 
 // finalizePaystackIntent verifies a Paystack charge and builds the real order
 // for a pending PaymentIntent. Mirrors finalizeFlutterwaveIntent — shared by
-// the frontend finalize endpoint and the PaystackWebhook safety net.
+// the frontend finalize endpoint and the PaystackWebhook safety net, with the
+// same claimIntentOrWait guard against both firing at once.
 func finalizePaystackIntent(intent *models.PaymentIntent, reference string) (models.Order, error) {
 	if reference == "" {
 		return models.Order{}, fmt.Errorf("missing payment reference")
+	}
+
+	if order, handled, claimErr := claimIntentOrWait(intent); handled {
+		return order, claimErr
 	}
 
 	verification, err := utils.VerifyPaystackPayment(reference)
