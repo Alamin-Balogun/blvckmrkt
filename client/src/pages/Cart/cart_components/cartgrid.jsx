@@ -651,6 +651,7 @@ export default function CartGrid() {
   const [couponError,  setCouponError] = useState("");
   const [couponSuccess,setCouponSuccess] = useState("");
   const [updatingId,   setUpdatingId]  = useState(null);
+  const [qtyError,     setQtyError]    = useState("");
   const [brandShipping, setBrandShipping] = useState({});
 
   const navigate = useNavigate();
@@ -719,16 +720,26 @@ export default function CartGrid() {
 
   const updateQty = async (item, delta) => {
     const newQty = Math.max(1, item.qty + delta);
+    const prevQty = item.qty;
     setItems((prev) => prev.map((i) => i.cartItemId === item.cartItemId ? {...i, qty: newQty} : i));
     setUpdatingId(item.cartItemId);
+    setQtyError("");
     const token = getToken();
     try {
-      await fetch(`${API_BASE}/api/user/cart/${item.cartItemId}`, {
+      const res = await fetch(`${API_BASE}/api/user/cart/${item.cartItemId}`, {
         method: "PUT",
         headers: {Authorization: `Bearer ${token}`, "Content-Type": "application/json"},
         body: JSON.stringify({quantity: newQty}),
       });
-    } catch {}
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        setItems((prev) => prev.map((i) => i.cartItemId === item.cartItemId ? {...i, qty: prevQty} : i));
+        setQtyError(json.message || "Couldn't update quantity — not enough stock.");
+      }
+    } catch {
+      setItems((prev) => prev.map((i) => i.cartItemId === item.cartItemId ? {...i, qty: prevQty} : i));
+      setQtyError("Couldn't update quantity. Please try again.");
+    }
     setUpdatingId(null);
   };
 
@@ -892,6 +903,17 @@ export default function CartGrid() {
             </motion.div>
           ) : (
             <>
+              {qtyError && (
+                <motion.div initial={{opacity: 0}} animate={{opacity: 1}}
+                  style={{
+                    padding: "12px 16px", borderRadius: 10, marginBottom: 16,
+                    background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)",
+                    display: "flex", alignItems: "center", gap: 10,
+                  }}>
+                  <AlertIcon />
+                  <span style={{color: "#ef4444", fontSize: 11, lineHeight: 1.5}}>{qtyError}</span>
+                </motion.div>
+              )}
               {brandGroupList.map((group) => (
                 <div key={group.brandId ?? group.brand} className="brand-container">
                   <div className="brand-header">

@@ -141,6 +141,19 @@ func UpdateCartItem(c *gin.Context) {
 		return
 	}
 
+	// Same stock check AddToCart already does — without it, the cart's +
+	// button could quietly raise the quantity past available stock, and the
+	// mismatch would only surface as a hard failure at checkout.
+	if item.ProductSizeID != nil {
+		var sz models.ProductSize
+		if res := database.DB.First(&sz, *item.ProductSizeID); res.Error == nil {
+			if sz.Stock < req.Quantity {
+				utils.BadRequest(c, "Insufficient stock for selected size", nil)
+				return
+			}
+		}
+	}
+
 	database.DB.Model(&item).Update("quantity", req.Quantity)
 	utils.OK(c, "Cart item updated", item)
 }
