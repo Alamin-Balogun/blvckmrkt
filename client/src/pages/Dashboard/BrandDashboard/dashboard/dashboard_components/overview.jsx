@@ -252,10 +252,14 @@ export default function Overview({onNav}) {
   const convRate = stats.conversion_rate != null ? `${stats.conversion_rate}%` : "—";
   const totalRevenue = stats.total_revenue != null ? fmtMoney(stats.total_revenue) : "—";
 
-  // Commission calculation
+  // stats.revenue_this_month is already net of commission — it's summed from
+  // order_items.total_price, which is built from Product.Price, which the
+  // backend already computes as BrandPrice × (1 − commission_rate/100).
+  // Deducting commission again here double-counted it (the "double discount"
+  // bug) and made the brand's dashboard understate their true take-home.
   const commissionRate = Number(settings.commission_rate ?? 10);
   const revenueThisMonth = Number(stats.revenue_this_month ?? 0);
-  const netThisMonth = revenueThisMonth - (revenueThisMonth * commissionRate) / 100;
+  const netThisMonth = revenueThisMonth;
 
   // Low stock products
   const lowStockThreshold = Number(settings.low_stock_threshold ?? 5);
