@@ -38,6 +38,7 @@ func RegisterAdmin(r *gin.Engine) {
 		api.GET("/analytics/weekly",   handlers.AdminAnalyticsWeekly)
 		api.GET("/analytics/revenue",  handlers.AdminAnalyticsRevenue)
 		api.GET("/analytics/users",    handlers.AdminAnalyticsUsers)
+		api.GET("/analytics/visits",   handlers.AdminVisitAnalytics)
 
 		// ── User Management ───────────────────────────────────────────────────
 		api.GET("/users",             handlers.AdminListUsers)

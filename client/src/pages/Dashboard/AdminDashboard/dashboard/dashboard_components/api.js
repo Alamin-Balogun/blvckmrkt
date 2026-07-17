@@ -70,6 +70,7 @@ export const getAnalyticsWeekly = (offset = 0) => req("GET", `/analytics/weekly?
 export const getAnalyticsRevenue = (period = 30) =>
   req("GET", `/analytics/revenue?period=${period}`);
 export const getAnalyticsUsers = (period = 30) => req("GET", `/analytics/users?period=${period}`);
+export const getVisitAnalytics = (days = 30) => req("GET", `/analytics/visits?days=${days}`);
 
 // ── Users ─────────────────────────────────────────────────────────────────────
 export const getUsers = (p = {}) => req("GET", `/users?${new URLSearchParams(p)}`);

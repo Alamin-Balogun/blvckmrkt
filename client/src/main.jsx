@@ -8,6 +8,7 @@ import { Navigate } from "react-router-dom";
 import { useAuth } from "./pages/Auth/context/authcontext";
 
 import DashboardFAB from "./components/DashboardFAB";
+import VisitTracker from "./components/visittracker";
 
 function DashboardGuard({ children, required, redirect }) {
   const { user, loading } = useAuth();
@@ -101,6 +102,7 @@ createRoot(document.getElementById("root")).render(
             {/* ✅ Suspense wraps ALL routes — shows PageLoader while chunk downloads */}
             <Suspense fallback={<PageLoader />}>
             <DashboardFAB />
+            <VisitTracker />
               <Routes>
                 <Route path="/"                          element={<Home />} />
                 <Route path="/shop"                      element={<Shop />} />

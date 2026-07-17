@@ -5,6 +5,7 @@ import {
   getAnalyticsWeekly,
   getAnalyticsRevenue,
   getAnalyticsUsers,
+  getVisitAnalytics,
 } from "./dashboard_components/api";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -369,14 +370,17 @@ export default function AdminAnalytics() {
   const [weekly, setWeekly] = useState(null);
   const [revenue, setRevenue] = useState(null);
   const [users, setUsers] = useState(null);
+  const [visits, setVisits] = useState(null);
 
   const [weekOffset, setWeekOffset] = useState(0);
   const [revPeriod, setRevPeriod] = useState(30);
   const [userPeriod, setUserPeriod] = useState(30);
+  const [visitPeriod, setVisitPeriod] = useState(30);
 
   const [loadWeek, setLoadWeek] = useState(false);
   const [loadRev, setLoadRev] = useState(false);
   const [loadUser, setLoadUser] = useState(false);
+  const [loadVisits, setLoadVisits] = useState(false);
 
   // Initial overview load
   useEffect(() => {
@@ -412,10 +416,22 @@ export default function AdminAnalytics() {
       .finally(() => setLoadUser(false));
   }, [userPeriod]);
 
+  // Site visits — refetch on period change
+  useEffect(() => {
+    setLoadVisits(true);
+    getVisitAnalytics(visitPeriod)
+      .then(setVisits)
+      .catch(() => setVisits({daily: [], top_paths: [], top_referrers: []}))
+      .finally(() => setLoadVisits(false));
+  }, [visitPeriod]);
+
   const ov = overview || {};
   const weekDays = weekly?.days || [];
   const revDays = revenue?.days || [];
   const userDays = users?.days || [];
+  const visitDays = visits?.daily || [];
+  const topPaths = visits?.top_paths || [];
+  const topReferrers = visits?.top_referrers || [];
   const weekLabel = weekly?.week_label || "This Week";
 
   const userSegments = [
@@ -553,6 +569,58 @@ export default function AdminAnalytics() {
           </>
         )}
       </Card>
+
+      {/* ── Site visits (configurable period) ── */}
+      <Card
+        title="Site Visits"
+        topRight={<PeriodSelect value={visitPeriod} onChange={setVisitPeriod} />}>
+        {loadVisits ? (
+          <SkeletonBars count={visitPeriod > 14 ? 14 : visitPeriod} />
+        ) : visitDays.length === 0 ? (
+          <EmptyChart />
+        ) : (
+          <>
+            <BarChart data={visitDays} valueKey="visits" labelKey="day" color="#22c55e" height={110} />
+            <ChartSummary data={visitDays} valueKey="visits" color="#22c55e" />
+            <div style={{display: "flex", gap: 20, marginTop: 10, fontSize: 12, color: "rgba(255,255,255,0.5)"}}>
+              <span><strong style={{color: "#fff"}}>{visits?.total_visits ?? 0}</strong> total visits</span>
+              <span><strong style={{color: "#fff"}}>{visits?.unique_visitors ?? 0}</strong> unique visitors</span>
+            </div>
+          </>
+        )}
+      </Card>
+
+      {/* ── Top pages / referrers ── */}
+      <div className="an-two" style={{display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14}}>
+        <Card title="Top Pages">
+          {topPaths.length === 0 ? (
+            <EmptyChart />
+          ) : (
+            <div style={{display: "flex", flexDirection: "column", gap: 8}}>
+              {topPaths.map((p) => (
+                <div key={p.path} style={{display: "flex", justifyContent: "space-between", fontSize: 12}}>
+                  <span style={{color: "rgba(255,255,255,0.6)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 220}}>{p.path}</span>
+                  <span style={{color: "#22c55e", fontWeight: 700}}>{p.visits}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+        <Card title="Top Referrers">
+          {topReferrers.length === 0 ? (
+            <EmptyChart msg="No referrer traffic yet" />
+          ) : (
+            <div style={{display: "flex", flexDirection: "column", gap: 8}}>
+              {topReferrers.map((r) => (
+                <div key={r.referrer} style={{display: "flex", justifyContent: "space-between", fontSize: 12}}>
+                  <span style={{color: "rgba(255,255,255,0.6)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 220}}>{r.referrer}</span>
+                  <span style={{color: "#22c55e", fontWeight: 700}}>{r.visits}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      </div>
 
       {/* ── Donut breakdowns ── */}
       <div className="an-two" style={{display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14}}>

@@ -102,6 +102,9 @@ func main() {
 		// BUYER <-> BRAND MESSAGING
 		&models.Message{},
 
+		// SITE VISIT ANALYTICS
+		&models.SiteVisit{},
+
 		// ✅ SUBSCRIPTION PLANS
 		&models.SubscriptionPlanConfig{},
 

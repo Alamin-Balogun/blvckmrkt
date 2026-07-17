@@ -20,6 +20,9 @@ func Register(r *gin.Engine) {
         api.POST("/paystack/webhook", handlers.PaystackWebhook)
         api.POST("/flutterwave/webhook", handlers.FlutterwaveWebhook)
 
+	// ── Site visit tracking (public, fire-and-forget beacon) ───────────────────
+	api.POST("/track/visit", middleware.RateLimit(120, time.Minute), handlers.TrackVisit)
+
 	// ── Image upload (any logged-in account) ───────────────────────────────────
 	api.POST("/upload", middleware.Auth(), handlers.UploadImage)
 
