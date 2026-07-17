@@ -49,6 +49,70 @@ function Skel({h = 14, w = "100%", r = 6, mb = 0}) {
   );
 }
 
+// Guided setup checklist — most commonly catches a brand that never
+// configured shipping, which silently blocks buyers from checking out
+// with them at all ("This brand hasn't set up shipping yet" in the cart)
+// rather than surfacing anywhere on the brand's own dashboard.
+function OnboardingChecklist({onboarding, onNav}) {
+  if (!onboarding || onboarding.complete) return null;
+
+  const steps = [
+    {done: onboarding.has_shipping, label: "Set up shipping", nav: "shipping", urgent: true,
+      hint: "Buyers can't check out with you until you add at least one shipping method or pickup location."},
+    {done: onboarding.has_bank_account, label: "Add a payout bank account", nav: "bank_account",
+      hint: "We need this to pay you out for completed orders."},
+    {done: onboarding.has_products, label: "List your first product", nav: "products",
+      hint: "Your storefront is empty until you add something to sell."},
+    {done: onboarding.has_logo, label: "Upload a brand logo", nav: "settings",
+      hint: "Shown on your storefront and order emails."},
+    {done: onboarding.partnership_signed, label: "Sign the partnership agreement", nav: "settings",
+      hint: "Required before your brand can go live."},
+  ];
+  const remaining = steps.filter((s) => !s.done);
+  if (remaining.length === 0) return null;
+
+  return (
+    <div
+      style={{
+        background: "rgba(239,68,68,0.05)",
+        border: "1px solid rgba(239,68,68,0.18)",
+        borderRadius: 12,
+        padding: "16px 18px",
+        marginBottom: 20,
+      }}>
+      <p style={{color: "#fff", fontSize: 12, fontWeight: 700, margin: "0 0 2px"}}>
+        Finish setting up your account
+      </p>
+      <p style={{color: "rgba(255,255,255,0.4)", fontSize: 11, margin: "0 0 12px"}}>
+        {remaining.length} step{remaining.length !== 1 ? "s" : ""} left — some of these are quietly blocking sales.
+      </p>
+      <div style={{display: "flex", flexDirection: "column", gap: 6}}>
+        {remaining.map((s) => (
+          <button
+            key={s.nav + s.label}
+            onClick={() => onNav?.(s.nav)}
+            style={{
+              display: "flex", alignItems: "center", gap: 10,
+              background: "rgba(255,255,255,0.03)",
+              border: `1px solid ${s.urgent ? "rgba(239,68,68,0.3)" : "rgba(255,255,255,0.08)"}`,
+              borderRadius: 8, padding: "9px 12px", cursor: "pointer", textAlign: "left",
+            }}>
+            <span style={{
+              width: 16, height: 16, borderRadius: "50%", flexShrink: 0,
+              border: `2px solid ${s.urgent ? "#ef4444" : "rgba(255,255,255,0.25)"}`,
+            }} />
+            <span style={{flex: 1, minWidth: 0}}>
+              <span style={{display: "block", color: "#fff", fontSize: 12, fontWeight: 600}}>{s.label}</span>
+              <span style={{display: "block", color: "rgba(255,255,255,0.35)", fontSize: 10, marginTop: 1}}>{s.hint}</span>
+            </span>
+            <span style={{color: "rgba(255,255,255,0.3)", fontSize: 11}}>→</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function Badge({status}) {
   const s = STATUS_MAP[status] || {
     color: "#fff",
@@ -246,6 +310,8 @@ export default function Overview({onNav}) {
     !Array.isArray(data.order_breakdown)
       ? data.order_breakdown
       : {};
+  const onboarding =
+    data?.onboarding && typeof data.onboarding === "object" ? data.onboarding : null;
 
   const activeProds = stats.active_products ?? stats.product_count ?? "—";
   const pendingOrders = stats.pending_orders ?? "—";
@@ -297,6 +363,8 @@ export default function Overview({onNav}) {
       `}</style>
 
       <MaintenanceBanner />
+
+      {!loading && <OnboardingChecklist onboarding={onboarding} onNav={onNav} />}
 
       {/* Purchases paused banner */}
       {settings.disable_purchases && (

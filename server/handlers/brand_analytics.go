@@ -297,6 +297,30 @@ func BrandOverview(c *gin.Context) {
 	}
 
 	// ──────────────────────────────────────────────────────────────────────────
+	// 5. ONBOARDING CHECKLIST — surfaces the specific gaps that quietly break
+	// a brand's storefront (most commonly: no shipping configured at all,
+	// so buyers hit "This brand hasn't set up shipping yet" and can't
+	// checkout from them) instead of leaving the brand to discover it later.
+	// ──────────────────────────────────────────────────────────────────────────
+	var shippingMethodCount, localRateCount, pickupCount int64
+	database.DB.Model(&models.ShippingMethod{}).Where("brand_id = ?", brand.ID).Count(&shippingMethodCount)
+	database.DB.Model(&models.LocalShippingRate{}).Where("brand_id = ?", brand.ID).Count(&localRateCount)
+	database.DB.Model(&models.PickupLocation{}).Where("brand_id = ?", brand.ID).Count(&pickupCount)
+	hasShipping := shippingMethodCount > 0 || localRateCount > 0 || pickupCount > 0
+
+	var bankAccountCount int64
+	database.DB.Model(&models.BrandBankAccount{}).Where("brand_id = ?", brand.ID).Count(&bankAccountCount)
+
+	onboarding := gin.H{
+		"has_shipping":        hasShipping,
+		"has_bank_account":    bankAccountCount > 0,
+		"has_logo":            brand.LogoURL != "",
+		"has_products":        productCount > 0,
+		"partnership_signed":  brand.PartnershipSigned,
+		"complete":            hasShipping && bankAccountCount > 0 && brand.LogoURL != "" && productCount > 0 && brand.PartnershipSigned,
+	}
+
+	// ──────────────────────────────────────────────────────────────────────────
 	// RESPONSE
 	// ──────────────────────────────────────────────────────────────────────────
 	utils.OK(c, "Overview fetched", gin.H{
@@ -315,6 +339,7 @@ func BrandOverview(c *gin.Context) {
 		"order_breakdown": breakdown,
 		"recent_orders":   recentOrderRows,
 		"top_products":    topProductsWithSizes,
+		"onboarding":      onboarding,
 	})
 }
 
