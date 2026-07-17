@@ -37,6 +37,101 @@ const PAYMENT_STATUS_COLORS = {
 const ALL_STATUSES = ["pending", "processing", "shipped", "delivered", "cancelled", "refunded"];
 const PAYMENT_STATUSES = ["paid", "unpaid", "pending", "refunded", "failed"];
 
+// ── Admin-issued receipt ──────────────────────────────────────────────────────
+// Builds a self-contained, printable receipt from data already loaded in the
+// order drawer — no backend endpoint needed. Opens in a new tab and triggers
+// the browser print dialog, where the admin can print or "Save as PDF".
+function buildReceiptHTML(order, buyer, address, items) {
+  const money = (n) => `₦${Number(n || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+  const esc = (s) => String(s ?? "").replace(/[&<>]/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;"}[c]));
+
+  const rows = (items || []).map((it) => `
+    <tr>
+      <td style="padding:10px 0;border-bottom:1px solid #e5e5e5;">
+        ${esc(it.product_name || it.name)}${it.size && it.size !== "—" ? ` <span style="color:#888;">(Size ${esc(it.size)})</span>` : ""}
+      </td>
+      <td style="padding:10px 0;border-bottom:1px solid #e5e5e5;text-align:center;">${Number(it.quantity || 0)}</td>
+      <td style="padding:10px 0;border-bottom:1px solid #e5e5e5;text-align:right;">${money(it.unit_price)}</td>
+      <td style="padding:10px 0;border-bottom:1px solid #e5e5e5;text-align:right;">${money(it.total_price)}</td>
+    </tr>`).join("");
+
+  const addressBlock = address
+    ? `${esc(address.line1)}${address.line2 ? `, ${esc(address.line2)}` : ""}, ${esc(address.city)}${address.state ? `, ${esc(address.state)}` : ""} ${esc(address.postcode || "")}, ${esc(address.country)}`
+    : "—";
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Receipt — ${esc(order?.display_id)}</title>
+<style>
+  @media print { .no-print { display: none !important; } }
+  body { font-family: -apple-system, system-ui, sans-serif; background: #fafafa; color: #111; margin: 0; padding: 40px; }
+  .sheet { max-width: 640px; margin: 0 auto; background: #fff; border: 1px solid #e5e5e5; border-radius: 12px; padding: 40px; }
+  .brand { font-size: 22px; font-weight: 900; letter-spacing: 0.04em; }
+  .brand span { color: #ef4444; }
+  table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+  th { text-align: left; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: #888; padding-bottom: 8px; border-bottom: 2px solid #111; }
+  th:nth-child(2) { text-align: center; } th:nth-child(3), th:nth-child(4) { text-align: right; }
+</style>
+</head>
+<body onload="window.print()">
+  <div class="sheet">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;">
+      <div class="brand">BLVCK<span>MRKT</span></div>
+      <div style="text-align:right;">
+        <p style="margin:0;font-weight:700;font-size:14px;">RECEIPT</p>
+        <p style="margin:2px 0 0;color:#888;font-size:12px;">${esc(order?.display_id)}</p>
+      </div>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;gap:24px;margin-bottom:8px;font-size:12px;color:#555;">
+      <div>
+        <p style="margin:0 0 4px;color:#888;text-transform:uppercase;font-size:10px;letter-spacing:0.1em;">Billed To</p>
+        <p style="margin:0;font-weight:600;color:#111;">${esc(buyer?.name)}</p>
+        <p style="margin:2px 0;">${esc(buyer?.email)}</p>
+        <p style="margin:2px 0;">${addressBlock}</p>
+      </div>
+      <div style="text-align:right;">
+        <p style="margin:0 0 4px;color:#888;text-transform:uppercase;font-size:10px;letter-spacing:0.1em;">Date</p>
+        <p style="margin:0;">${order?.created_at ? new Date(order.created_at).toLocaleDateString() : "—"}</p>
+        <p style="margin:8px 0 4px;color:#888;text-transform:uppercase;font-size:10px;letter-spacing:0.1em;">Payment</p>
+        <p style="margin:0;">${esc(order?.payment_method)} · ${esc(order?.payment_status)}</p>
+      </div>
+    </div>
+
+    <table>
+      <thead><tr><th>Item</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+
+    <div style="margin-top:20px;display:flex;justify-content:flex-end;">
+      <div style="width:220px;">
+        <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;">
+          <span style="color:#888;">Subtotal</span><span>${money(order?.subtotal)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;">
+          <span style="color:#888;">Shipping</span><span>${money(order?.shipping_fee)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:8px 0;margin-top:4px;border-top:2px solid #111;font-weight:900;font-size:16px;">
+          <span>Total</span><span>${money(order?.total)}</span>
+        </div>
+      </div>
+    </div>
+
+    <p style="margin-top:36px;text-align:center;color:#aaa;font-size:11px;">
+      Receipt issued by BLVCKMRKT admin · ${new Date().toLocaleDateString()}
+    </p>
+  </div>
+  <div class="no-print" style="text-align:center;margin-top:16px;">
+    <button onclick="window.print()" style="padding:10px 20px;border-radius:8px;border:none;background:#ef4444;color:#fff;font-weight:700;cursor:pointer;">
+      Print / Save as PDF
+    </button>
+  </div>
+</body>
+</html>`;
+}
+
 function fmtDate(iso, withTime = false) {
   if (!iso) return "—";
   const opts = {day: "numeric", month: "short", year: "numeric"};
@@ -1069,16 +1164,35 @@ function OrderDrawer({orderId, onClose, onStatusChange, onPaymentStatusChange, o
               </p>
             </div>
           )}
-          <button
-            onClick={onClose}
-            style={{
-              width: 30, height: 30, borderRadius: "50%",
-              background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
-              cursor: "pointer", color: "rgba(255,255,255,0.5)", fontSize: 12,
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}>
-            ✕
-          </button>
+          <div style={{display: "flex", alignItems: "center", gap: 8}}>
+            {!loading && order && (
+              <button
+                onClick={() => {
+                  const html = buildReceiptHTML(order, buyer, address, items);
+                  const win = window.open("", "_blank");
+                  if (win) { win.document.write(html); win.document.close(); }
+                }}
+                title="Print / save receipt"
+                style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  height: 30, padding: "0 12px", borderRadius: 7,
+                  background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)",
+                  cursor: "pointer", color: "#ef4444", fontSize: 11, fontWeight: 700,
+                }}>
+                🧾 Receipt
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              style={{
+                width: 30, height: 30, borderRadius: "50%",
+                background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+                cursor: "pointer", color: "rgba(255,255,255,0.5)", fontSize: 12,
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+              ✕
+            </button>
+          </div>
         </div>
 
         {loading ? (
