@@ -50,7 +50,7 @@ func CreateAddress(c *gin.Context) {
 	if count == 0 { req.IsDefault = true }
 
 	addr := models.Address{
-		UserID:    userID,
+		UserID:    &userID,
 		Label:     req.Label,
 		Line1:     req.Line1,
 		Line2:     req.Line2,

@@ -8,9 +8,10 @@ import (
 
 // Address is shared between buyers and brands.
 // UserID links to users.id — any account type can have multiple addresses.
+// Nullable: a guest checkout address isn't owned by any account.
 type Address struct {
 	ID        uint           `gorm:"primaryKey;autoIncrement"             json:"id"`
-	UserID    uint           `gorm:"not null;index"                       json:"user_id"`
+	UserID    *uint          `gorm:"index"                                json:"user_id"`
 	Label     string         `gorm:"type:varchar(80);not null"            json:"label"`          // "Home", "Work", etc.
 	Line1     string         `gorm:"type:varchar(255);not null"           json:"line1"`          // Street address
 	Line2     string         `gorm:"type:varchar(255)"                    json:"line2,omitempty"`
@@ -40,9 +41,13 @@ type AddressResponse struct {
 }
 
 func (a *Address) ToResponse() AddressResponse {
+	var userID uint
+	if a.UserID != nil {
+		userID = *a.UserID
+	}
 	return AddressResponse{
 		ID:        a.ID,
-		UserID:    a.UserID,
+		UserID:    userID,
 		Label:     a.Label,
 		Line1:     a.Line1,
 		Line2:     a.Line2,

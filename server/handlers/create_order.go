@@ -353,7 +353,7 @@ func CreateOrder(c *gin.Context) {
 		return
 	}
 
-	order, txErr := buildOrder(uid, req, paymentStatus, paymentRef, func(tx *gorm.DB, orderID uint, orderTotal float64) error {
+	order, txErr := buildOrder(&uid, req, paymentStatus, paymentRef, func(tx *gorm.DB, orderID uint, orderTotal float64) error {
 		switch req.Payment.Method {
 		case "paystack", "card":
 			gatewayDetails := models.OrderPaymentGateway{
@@ -488,8 +488,9 @@ func validateCreateOrderRequest(req createOrderRequest) error {
 // (CreateOrder) and by the redirect-based hosted-checkout callback flow
 // (payment_gateway.go) once that gateway's payment has already been verified —
 // savePaymentDetails is where each caller writes its own payment-detail snapshot.
+// uid is nil for guest checkout — no account to own the address or the order.
 func buildOrder(
-	uid uint,
+	uid *uint,
 	req createOrderRequest,
 	paymentStatus, paymentRef string,
 	savePaymentDetails func(tx *gorm.DB, orderID uint, orderTotal float64) error,
@@ -507,12 +508,19 @@ func buildOrder(
 		label := req.Delivery.FirstName + " " + req.Delivery.LastName
 
 		var address models.Address
-		err := database.DB.Where(
-			"user_id = ? AND line1 = ? AND city = ? AND postcode = ? AND country = ?",
-			uid, line1, req.Delivery.City, req.Delivery.Zip, req.Delivery.Country,
-		).First(&address).Error
+		var lookupErr error
+		if uid != nil {
+			// Only look for a reusable saved address when there's an account
+			// to own it — a guest has no address history to reuse.
+			lookupErr = database.DB.Where(
+				"user_id = ? AND line1 = ? AND city = ? AND postcode = ? AND country = ?",
+				*uid, line1, req.Delivery.City, req.Delivery.Zip, req.Delivery.Country,
+			).First(&address).Error
+		} else {
+			lookupErr = gorm.ErrRecordNotFound
+		}
 
-		if err == gorm.ErrRecordNotFound {
+		if lookupErr == gorm.ErrRecordNotFound {
 			address = models.Address{
 				UserID:   uid,
 				Label:    label,
@@ -528,8 +536,8 @@ func buildOrder(
 				return models.Order{}, fmt.Errorf("failed to save delivery address")
 			}
 			log.Printf("✅ Address created: ID=%d", address.ID)
-		} else if err != nil {
-			log.Printf("❌ Address lookup failed: %v", err)
+		} else if lookupErr != nil {
+			log.Printf("❌ Address lookup failed: %v", lookupErr)
 			return models.Order{}, fmt.Errorf("failed to look up address")
 		} else {
 			log.Printf("✅ Reusing address: ID=%d", address.ID)

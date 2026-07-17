@@ -48,8 +48,8 @@ func AdminListOrders(c *gin.Context) {
 		Select(`
 			o.id, o.display_id, o.status, o.payment_status, o.payment_method, o.payment_ref,
 			o.subtotal, o.shipping_fee, o.total, o.currency, o.delivery_type,
-			CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) AS buyer_name,
-			u.email AS buyer_email,
+			CASE WHEN o.user_id IS NULL THEN 'Guest' ELSE TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))) END AS buyer_name,
+			COALESCE(u.email, o.contact_email) AS buyer_email,
 			o.contact_email, o.contact_phone,
 			COALESCE(opt.receipt_url, '') AS receipt_url,
 			(SELECT COUNT(*) FROM order_items oi WHERE oi.order_id = o.id) AS item_count,
@@ -170,7 +170,7 @@ func AdminCreateOrder(c *gin.Context) {
 
 		if err == gorm.ErrRecordNotFound {
 			address = models.Address{
-				UserID:   req.UserID,
+				UserID:   &req.UserID,
 				Label:    label,
 				Line1:    line1,
 				Line2:    line2,
@@ -266,7 +266,7 @@ func AdminCreateOrder(c *gin.Context) {
 		}
 
 		order = models.Order{
-			UserID:        req.UserID,
+			UserID:        &req.UserID,
 			AddressID:     addressID,
 			Subtotal:      subtotal,
 			ShippingFee:   shippingFee,
@@ -371,8 +371,14 @@ func AdminGetOrder(c *gin.Context) {
 		return
 	}
 
-	var buyer models.User
-	database.DB.Select("id, first_name, last_name, email").First(&buyer, order.UserID)
+	buyerName, buyerEmail := "Guest", order.ContactEmail
+	if order.UserID != nil {
+		var buyer models.User
+		if database.DB.Select("id, first_name, last_name, email").First(&buyer, *order.UserID).Error == nil {
+			buyerName = buyer.FirstName + " " + buyer.LastName
+			buyerEmail = buyer.Email
+		}
+	}
 
 	var address *models.Address
 	if order.AddressID != nil {
@@ -385,8 +391,9 @@ func AdminGetOrder(c *gin.Context) {
 	// Build comprehensive response
 	response := gin.H{
 		"order":       order,
-		"buyer_name":  buyer.FirstName + " " + buyer.LastName,
-		"buyer_email": buyer.Email,
+		"buyer_name":  buyerName,
+		"buyer_email": buyerEmail,
+		"is_guest":    order.UserID == nil,
 		"address":     address,
 	}
 

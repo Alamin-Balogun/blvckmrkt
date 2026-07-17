@@ -164,10 +164,8 @@ export default function ProductDetail() {
 
 const handleBuyNow = () => {
   if (!selectedSize && (product.sizes?.length ?? 0) > 0) return;
-  if (!getToken()) {
-    navigate("/login");
-    return;
-  }
+  // No login required — Buy Now supports guest checkout (bank transfer only,
+  // see checkoutform.jsx). The cart itself still requires an account.
   // Navigate to checkout with just this product — Buy Now is single-item only.
   // The cart is not modified so existing cart items are unaffected.
   navigate("/checkout", {

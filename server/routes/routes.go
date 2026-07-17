@@ -1,6 +1,8 @@
 package routes
 
 import (
+	"time"
+
 	"github.com/Alamin-Balogun/blvckmrkt/handlers"
 	"github.com/Alamin-Balogun/blvckmrkt/middleware"
 	"github.com/gin-gonic/gin"
@@ -112,6 +114,14 @@ func Register(r *gin.Engine) {
 		// Blog comments
 		userShop.POST("/blog/:slug/comments",   handlers.CreateBlogComment)
 		userShop.DELETE("/blog/comments/:id",   handlers.DeleteOwnBlogComment)
+	}
+
+	// ── Guest checkout (public, no account required) ────────────────────────────
+	// Rate-limited since it's unauthenticated and can trigger real
+	// payment-gateway verification calls.
+	guest := api.Group("/guest", middleware.RateLimit(10, 10*time.Minute))
+	{
+		guest.POST("/orders", handlers.CreateGuestOrder)
 	}
 
 	// ── Buyer dashboard ─────────────────────────────────────────────────────────

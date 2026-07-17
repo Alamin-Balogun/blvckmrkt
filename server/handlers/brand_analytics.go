@@ -186,7 +186,9 @@ func BrandOverview(c *gin.Context) {
 	// Load buyer names
 	buyerIDs := make([]uint, 0, len(recentOrders))
 	for _, o := range recentOrders {
-		buyerIDs = append(buyerIDs, o.UserID)
+		if o.UserID != nil {
+			buyerIDs = append(buyerIDs, *o.UserID)
+		}
 	}
 	var buyerUsers []models.User
 	if len(buyerIDs) > 0 {
@@ -238,11 +240,17 @@ func BrandOverview(c *gin.Context) {
 		if len(items) > 1 {
 			itemName += fmt.Sprintf(" +%d more", len(items)-1)
 		}
+		buyerName := "Guest"
+		if o.UserID != nil {
+			if name, ok := buyerNameMap[*o.UserID]; ok {
+				buyerName = name
+			}
+		}
 		recentOrderRows = append(recentOrderRows, RecentOrderRow{
 			OrderID:    o.ID,
 			DisplayID:  o.DisplayID,
 			Status:     string(o.Status),
-			BuyerName:  buyerNameMap[o.UserID],
+			BuyerName:  buyerName,
 			ItemName:   itemName,
 			BrandTotal: brandTotal,
 			CreatedAt:  o.CreatedAt.Format(time.RFC3339),

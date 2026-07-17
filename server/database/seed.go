@@ -180,8 +180,8 @@ func Seed(db *gorm.DB) {
 	log.Println("[seed] products + images + sizes created")
 
 	// ── 6. Buyer Addresses ────────────────────────────────────────────────────
-	addr1 := models.Address{UserID: buyer1.ID, Label: "Home", Line1: "14 Oxford Street", City: "London", State: "England", Postcode: "W1D 1AB", Country: "United Kingdom", IsDefault: true}
-	addr2 := models.Address{UserID: buyer1.ID, Label: "Work", Line1: "30 Shoreditch High St", Line2: "Floor 2", City: "London", State: "England", Postcode: "E1 6PQ", Country: "United Kingdom"}
+	addr1 := models.Address{UserID: &buyer1.ID, Label: "Home", Line1: "14 Oxford Street", City: "London", State: "England", Postcode: "W1D 1AB", Country: "United Kingdom", IsDefault: true}
+	addr2 := models.Address{UserID: &buyer1.ID, Label: "Work", Line1: "30 Shoreditch High St", Line2: "Floor 2", City: "London", State: "England", Postcode: "E1 6PQ", Country: "United Kingdom"}
 	db.Create(&addr1)
 	db.Create(&addr2)
 	log.Println("[seed] addresses created")
@@ -204,7 +204,7 @@ func Seed(db *gorm.DB) {
 	addrID := addr1.ID
 
 	order1 := models.Order{
-		UserID:        buyer1.ID,
+		UserID:        &buyer1.ID,
 		AddressID:     &addrID,
 		Subtotal:      528,
 		ShippingFee:   0,
@@ -218,7 +218,7 @@ func Seed(db *gorm.DB) {
 	db.Create(&models.OrderItem{OrderID: order1.ID, ProductID: products[9].ID, BrandID: brand1.ID, ProductName: products[9].Name, Size: "One Size", Quantity: 1, UnitPrice: 54,  TotalPrice: 54,  ImageURL: "https://images.unsplash.com/photo-1556306535-0f09a537f0a3?w=600&q=80"})
 
 	order2 := models.Order{
-		UserID:        buyer1.ID,
+		UserID:        &buyer1.ID,
 		AddressID:     &addrID,
 		Subtotal:      185,
 		ShippingFee:   0,
@@ -231,7 +231,7 @@ func Seed(db *gorm.DB) {
 	db.Create(&models.OrderItem{OrderID: order2.ID, ProductID: products[3].ID, BrandID: brand2.ID, ProductName: products[3].Name, Size: "M", Quantity: 1, UnitPrice: 185, TotalPrice: 185, ImageURL: "https://images.unsplash.com/photo-1556821840-3a63f15732ce?w=600&q=80"})
 
 	order3 := models.Order{
-		UserID:        buyer1.ID,
+		UserID:        &buyer1.ID,
 		AddressID:     &addrID,
 		Subtotal:      210,
 		ShippingFee:   5,

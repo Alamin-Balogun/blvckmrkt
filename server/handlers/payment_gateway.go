@@ -320,7 +320,7 @@ func finalizeFlutterwaveIntent(intent *models.PaymentIntent, transactionID strin
 	}
 	responseJSON, _ := json.Marshal(verification.Data)
 
-	order, txErr := buildOrder(intent.UserID, req, "paid", verification.Data.TxRef, func(tx *gorm.DB, orderID uint, orderTotal float64) error {
+	order, txErr := buildOrder(&intent.UserID, req, "paid", verification.Data.TxRef, func(tx *gorm.DB, orderID uint, orderTotal float64) error {
 		gatewayDetails := models.OrderPaymentGateway{
 			OrderID:         orderID,
 			Gateway:         "flutterwave",
@@ -580,7 +580,7 @@ func finalizePaystackIntent(intent *models.PaymentIntent, reference string) (mod
 	}
 	responseJSON, _ := json.Marshal(verification.Data)
 
-	order, txErr := buildOrder(intent.UserID, req, "paid", verification.Data.Reference, func(tx *gorm.DB, orderID uint, orderTotal float64) error {
+	order, txErr := buildOrder(&intent.UserID, req, "paid", verification.Data.Reference, func(tx *gorm.DB, orderID uint, orderTotal float64) error {
 		gatewayDetails := models.OrderPaymentGateway{
 			OrderID:         orderID,
 			Gateway:         "paystack",

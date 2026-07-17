@@ -681,7 +681,10 @@ export default function CheckoutForm() {
     country_code: "",
     country_name: "",
   });
-  const [payment, setPayment] = useState({method: "flutterwave"});
+  // Guest checkout only supports bank transfer (see guest_checkout.go) —
+  // the hosted-checkout gateways are tied to an authenticated PaymentIntent.
+  const isGuest = !getToken();
+  const [payment, setPayment] = useState(() => ({method: isGuest ? "transfer" : "flutterwave"}));
 
   const [receipt, setReceipt] = useState(null);
   const [receiptError, setReceiptError] = useState("");
@@ -1325,7 +1328,9 @@ if (receipt) {
         };
 
         console.log("📤 Sending transfer order request...");
-        const res = await fetch(`${API_BASE}/api/user/orders`, {
+        // No token = guest checkout, hits the separate unauthenticated
+        // endpoint (identified by contact.email instead of an account).
+        const res = await fetch(`${API_BASE}${token ? "/api/user/orders" : "/api/guest/orders"}`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -2606,7 +2611,8 @@ if (!delivery.country_code && geoLoaded) {
                   <p className="co-section-title">Payment Method</p>
                   <div className="co-pay-tabs">
                     {paymentMethods.map((m) => {
-                      const disabled = m.comingSoon && !CARD_PAYMENTS_ENABLED;
+                      const guestLocked = isGuest && m.id !== "transfer";
+                      const disabled = (m.comingSoon && !CARD_PAYMENTS_ENABLED) || guestLocked;
                       return (
                         <div
                           key={m.id}
@@ -2615,13 +2621,20 @@ if (!delivery.country_code && geoLoaded) {
                             if (disabled) return;
                             setPayment({method: m.id});
                           }}>
-                          {disabled && <span className="co-pay-tab-badge">Coming Soon</span>}
+                          {guestLocked
+                            ? <span className="co-pay-tab-badge">Log in to use</span>
+                            : disabled && <span className="co-pay-tab-badge">Coming Soon</span>}
                           <span className="co-pay-tab-icon">{m.icon}</span>
                           <span className="co-pay-tab-label">{m.label}</span>
                         </div>
                       );
                     })}
                   </div>
+                  {isGuest && (
+                    <p style={{color: "rgba(255,255,255,0.35)", fontSize: 11, marginTop: 8}}>
+                      Checking out as a guest supports bank transfer. <Link to="/login" style={{color: "#ef4444"}}>Log in</Link> to pay by card or Flutterwave.
+                    </p>
+                  )}
 
                   {payment.method === "card" && (
                     <div

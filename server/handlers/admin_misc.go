@@ -339,7 +339,7 @@ func AdminCreateAddress(c *gin.Context) {
 	}
 
 	addr := models.Address{
-		UserID:    req.UserID,
+		UserID:    &req.UserID,
 		Label:     req.Label,
 		Line1:     req.Line1,
 		Line2:     req.Line2,

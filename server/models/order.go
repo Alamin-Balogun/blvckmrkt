@@ -40,7 +40,9 @@ const (
 type Order struct {
 	ID            uint           `gorm:"primaryKey;autoIncrement"               json:"id"`
 	DisplayID     string         `gorm:"type:varchar(20);uniqueIndex;not null"  json:"display_id"`
-	UserID        uint           `gorm:"not null;index"                         json:"user_id"`
+	// UserID is nil for guest checkout orders — those are identified by
+	// ContactEmail/ContactPhone below instead of an account.
+	UserID        *uint          `gorm:"index"                                  json:"user_id"`
 	AddressID     *uint          `gorm:"index"                                  json:"address_id"`
 	Subtotal      float64        `gorm:"type:decimal(10,2);not null"            json:"subtotal"`
 	ShippingFee   float64        `gorm:"type:decimal(10,2);default:0"           json:"shipping_fee"`

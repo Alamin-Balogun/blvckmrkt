@@ -175,7 +175,9 @@ func BrandListOrders(c *gin.Context) {
 
 	var userIDs []uint
 	for _, o := range orders {
-		userIDs = append(userIDs, o.UserID)
+		if o.UserID != nil {
+			userIDs = append(userIDs, *o.UserID)
+		}
 	}
 	var buyers []models.User
 	if len(userIDs) > 0 {
@@ -216,7 +218,13 @@ func BrandListOrders(c *gin.Context) {
 		for _, it := range items {
 			brandTotal += it.TotalPrice
 		}
-		buyer := buyerMap[o.UserID]
+		buyerName, buyerEmail := "Guest", o.ContactEmail
+		if o.UserID != nil {
+			if buyer, ok := buyerMap[*o.UserID]; ok {
+				buyerName = buyer.FirstName + " " + buyer.LastName
+				buyerEmail = buyer.Email
+			}
+		}
 
 		row := BrandOrderResponse{
 			OrderID:       o.ID,
@@ -224,8 +232,8 @@ func BrandListOrders(c *gin.Context) {
 			Status:        o.Status,
 			PaymentStatus: o.PaymentStatus,
 			CreatedAt:     o.CreatedAt.Format("Jan 02, 2006"),
-			BuyerName:     buyer.FirstName + " " + buyer.LastName,
-			BuyerEmail:    buyer.Email,
+			BuyerName:     buyerName,
+			BuyerEmail:    buyerEmail,
 			Items:         items,
 			BrandTotal:    brandTotal,
 			DeliveryType:  deliveryTypeMap[o.ID],
@@ -311,8 +319,14 @@ func BrandGetOrder(c *gin.Context) {
 	var items []models.OrderItem
 	database.DB.Where("order_id = ? AND brand_id = ?", orderID, brand.ID).Find(&items)
 
-	var buyer models.User
-	database.DB.Select("id, first_name, last_name, email").First(&buyer, order.UserID)
+	buyerName, buyerEmail := "Guest", order.ContactEmail
+	if order.UserID != nil {
+		var buyer models.User
+		if database.DB.Select("id, first_name, last_name, email").First(&buyer, *order.UserID).Error == nil {
+			buyerName = buyer.FirstName + " " + buyer.LastName
+			buyerEmail = buyer.Email
+		}
+	}
 
 	var address *models.Address
 	if order.AddressID != nil {
@@ -333,8 +347,8 @@ func BrandGetOrder(c *gin.Context) {
 		"status":         order.Status,
 		"payment_status": order.PaymentStatus,
 		"created_at":     order.CreatedAt.Format("Jan 02, 2006"),
-		"buyer_name":     buyer.FirstName + " " + buyer.LastName,
-		"buyer_email":    buyer.Email,
+		"buyer_name":     buyerName,
+		"buyer_email":    buyerEmail,
 		"address":        address,
 		"items":          items,
 		"brand_total":    brandTotal,
