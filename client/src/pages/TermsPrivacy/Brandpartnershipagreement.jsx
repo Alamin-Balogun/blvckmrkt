@@ -515,31 +515,31 @@ export default function BrandPartnershipAgreement() {
       .catch(() => {});
   }, [userToken]);
 
-  // ── Fetch registered brand name ───────────────────────────────────────────
+  // ── Resolve registered brand name ─────────────────────────────────────────
+  // The signing terminal must always reflect the CURRENT brand_name in the
+  // database — never a cached one. A brand can rename itself (UpdateBrandProfile)
+  // or start a fresh partnership session after their DB record already changed,
+  // and any nav-state/localStorage value from an earlier session would be stale.
+  // So those are only used as an instant placeholder to avoid a blank flash;
+  // the /api/brand/profile fetch is the sole source of truth and always wins.
   useEffect(() => {
     try {
-      // Priority 1: from navigation state
+      // Instant placeholder (may be stale) — avoids a blank field while the
+      // authoritative fetch below resolves.
       if (brandNameFromState) {
         setRegisteredBrandName(brandNameFromState);
-        return;
+      } else {
+        const savedBrandName = localStorage.getItem("brand_name") || "";
+        if (savedBrandName) {
+          setRegisteredBrandName(savedBrandName);
+        } else {
+          const raw  = localStorage.getItem("user") || sessionStorage.getItem("user") || "{}";
+          const user = JSON.parse(raw);
+          if (user?.brand_name) setRegisteredBrandName(user.brand_name);
+        }
       }
 
-      // Priority 2: dedicated localStorage key
-      const savedBrandName = localStorage.getItem("brand_name") || "";
-      if (savedBrandName) {
-        setRegisteredBrandName(savedBrandName);
-        return;
-      }
-
-      // Priority 3: stored user object
-      const raw  = localStorage.getItem("user") || sessionStorage.getItem("user") || "{}";
-      const user = JSON.parse(raw);
-      if (user?.brand_name) {
-        setRegisteredBrandName(user.brand_name);
-        return;
-      }
-
-      // Priority 4: fetch from API using correct token key
+      // Authoritative: always re-fetch the live value and overwrite the placeholder.
       const token =
         localStorage.getItem(TOKEN_KEY) ||
         sessionStorage.getItem(TOKEN_KEY) ||
