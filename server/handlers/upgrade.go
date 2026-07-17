@@ -82,8 +82,16 @@ func UpgradeToBrand(c *gin.Context) {
 			SubscriptionPlan:   "none",
 			SubscriptionStatus: models.SubStatusNone,
 		}
+		// Slug has a unique index — a buyer picking a name that collides with
+		// an existing brand's slug (easy to hit: "Supreme", "Palace", etc. are
+		// already-seeded demo brands) previously failed the whole upgrade with
+		// a generic "please try again" and no way forward. Retry once with the
+		// user's own ID appended, which is guaranteed unique.
 		if err := tx.Create(&brand).Error; err != nil {
-			return fmt.Errorf("failed to create brand profile: %w", err)
+			brand.Slug = fmt.Sprintf("%s-%d", utils.Slugify(brandName), userID)
+			if err2 := tx.Create(&brand).Error; err2 != nil {
+				return fmt.Errorf("failed to create brand profile: %w", err2)
+			}
 		}
 
 		return nil
