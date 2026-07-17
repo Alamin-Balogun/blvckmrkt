@@ -1,23 +1,19 @@
 import {useState, useEffect} from "react";
 import {motion, AnimatePresence} from "framer-motion";
-import {Badge, SearchBar, Icon} from "./Components";
+import {Icon} from "./Components";
+// These duplicated a broken local req() with no Authorization header, so
+// every call from this page 401'd against RequireAdmin() — the whole page
+// was non-functional. The shared api.js already has correctly-authenticated
+// versions of the exact same endpoints; use those instead.
+import {
+  getRolePrivileges,
+  saveRolePrivileges,
+  getUserPrivileges,
+  saveUserPrivileges,
+  getUsers,
+} from "./api";
 
-// ── API ───────────────────────────────────────────────────────────────────────
-const BASE = "/api/admin";
-async function req(method, path, body) {
-  const res = await fetch(`${BASE}${path}`, {
-    method,
-    headers: {"Content-Type": "application/json"},
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-const getRolePrivileges = () => req("GET", "/privileges/roles");
-const saveRolePrivileges = (role, data) => req("PATCH", `/privileges/roles/${role}`, data);
-const getUserPrivileges = (id) => req("GET", `/privileges/users/${id}`);
-const saveUserPrivileges = (id, data) => req("PATCH", `/privileges/users/${id}`, data);
-const searchUsers = (q) => req("GET", `/users?search=${encodeURIComponent(q)}&limit=10`);
+const searchUsers = (q) => getUsers({search: q, limit: 10});
 
 // ── All privilege definitions ──────────────────────────────────────────────────
 const PRIVILEGE_GROUPS = [
@@ -59,6 +55,33 @@ const PRIVILEGE_GROUPS = [
         key: "can_view_brand_analytics",
         label: "View brand analytics",
         desc: "Access sales and view metrics",
+      },
+      // ── Tiered brand privileges — off by default; grant per-brand via the
+      // "Individual" tab as a status upgrade rather than a role-wide default.
+      {
+        key: "featured_placement",
+        label: "Featured placement",
+        desc: "Eligible for the homepage 'top brands' rail and featured sections",
+      },
+      {
+        key: "exclusive_brand_badge",
+        label: "Exclusive brand badge",
+        desc: "Shown in the site's Exclusive Brands section with a badge on their profile",
+      },
+      {
+        key: "custom_storefront_branding",
+        label: "Custom storefront branding",
+        desc: "Can customize brand page banner/theme beyond the standard template",
+      },
+      {
+        key: "reduced_commission",
+        label: "Reduced commission eligibility",
+        desc: "Eligible for a lower commission rate (set the actual rate on the brand's Commission tab)",
+      },
+      {
+        key: "priority_support",
+        label: "Priority support",
+        desc: "Flagged for faster response on support requests",
       },
     ],
   },
@@ -498,7 +521,11 @@ function IndividualPrivileges() {
 
   const handleSelectUser = async (user) => {
     setSelectedUser(user);
-    setBaseRole(user.role || "buyer");
+    // API returns account_type ("user"/"brand"), not "role" — and this UI's
+    // role keys call the buyer account type "buyer", not "user". Reading the
+    // nonexistent .role field always fell back to "buyer", so selecting a
+    // brand account silently diffed its overrides against buyer defaults.
+    setBaseRole(user.account_type === "brand" ? "brand" : "buyer");
     setResults([]);
     setQuery(user.first_name ? `${user.first_name} ${user.last_name || ""}`.trim() : user.email);
     try {
@@ -625,7 +652,7 @@ function IndividualPrivileges() {
                         {u.first_name} {u.last_name}
                       </p>
                       <p style={{color: "rgba(255,255,255,0.35)", fontSize: 10, margin: 0}}>
-                        {u.email} · {u.role}
+                        {u.email} · {u.account_type}
                       </p>
                     </div>
                   ))}
