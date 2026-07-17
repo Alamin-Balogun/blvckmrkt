@@ -176,6 +176,8 @@ const fetchBrand = useCallback(() => {
         description: b?.description || "",
         logo_url: b?.logo_url || "",
         commission_rate: b?.commission_rate ?? "", // ✅ ADD THIS LINE
+        is_exclusive: !!b?.is_exclusive,
+        featured_rank: b?.featured_rank ?? "",
       });
     })
     .catch(console.error)
@@ -216,6 +218,19 @@ const handleSave = async () => {
         return;
       }
       payload.commission_rate = rate;
+    }
+
+    // featured_rank: number-or-null, same shape as commission_rate
+    if (payload.featured_rank === "" || payload.featured_rank === null) {
+      payload.featured_rank = null;
+    } else {
+      const rank = parseInt(payload.featured_rank, 10);
+      if (isNaN(rank)) {
+        setSaveError("Featured rank must be a whole number, or leave empty to unpin.");
+        setSaving(false);
+        return;
+      }
+      payload.featured_rank = rank;
     }
 
     await updateBrand(brand.id, payload);
@@ -389,6 +404,10 @@ const handleSave = async () => {
   {brand?.commission_rate !== null && brand?.commission_rate !== undefined && (
     <Badge label={`${brand.commission_rate}% custom fee`} color="#a855f7" />
   )}
+  {brand?.is_exclusive && <Badge label="★ Exclusive" color="#eab308" />}
+  {brand?.featured_rank !== null && brand?.featured_rank !== undefined && (
+    <Badge label={`Featured #${brand.featured_rank}`} color="#eab308" />
+  )}
 </div>
 
             {/* ── EDIT MODE ── */}
@@ -476,6 +495,50 @@ const handleSave = async () => {
         : `Custom rate: ${editFields.commission_rate}% — All products will be recalculated on save`}
     </p>
   </div>
+
+  {/* Discovery — featured rank + exclusive */}
+  <div style={{display: "flex", flexDirection: "column", gap: 4}}>
+    <label style={{color: "rgba(255,255,255,0.3)", fontSize: 10, fontWeight: 600}}>
+      Featured Rank
+      <span style={{color: "rgba(255,255,255,0.2)", fontWeight: 400, marginLeft: 4}}>
+        (optional — lower shows first in "Top Brands")
+      </span>
+    </label>
+    <input
+      type="number"
+      name="featured_rank"
+      value={editFields.featured_rank}
+      onChange={handleFieldChange}
+      step="1"
+      placeholder="Leave empty to not pin"
+      style={{
+        background: "rgba(255,255,255,0.04)",
+        border: "1px solid rgba(255,255,255,0.1)",
+        borderRadius: 7,
+        padding: "8px 10px",
+        color: "rgba(255,255,255,0.8)",
+        fontSize: 11,
+        outline: "none",
+        width: "100%",
+        boxSizing: "border-box",
+        transition: "border-color 0.15s",
+      }}
+      onFocus={(e) => (e.target.style.borderColor = "rgba(234,179,8,0.4)")}
+      onBlur={(e) => (e.target.style.borderColor = "rgba(255,255,255,0.1)")}
+    />
+  </div>
+  <label style={{display: "flex", alignItems: "center", gap: 8, cursor: "pointer", padding: "4px 0"}}>
+    <input
+      type="checkbox"
+      checked={editFields.is_exclusive}
+      onChange={(e) => setEditFields((prev) => ({...prev, is_exclusive: e.target.checked}))}
+      style={{width: 15, height: 15, accentColor: "#eab308"}}
+    />
+    <span style={{color: "rgba(255,255,255,0.6)", fontSize: 11, fontWeight: 600}}>
+      Exclusive brand <span style={{color: "rgba(255,255,255,0.25)", fontWeight: 400}}>— shown in the storefront's Exclusive Brands section</span>
+    </span>
+  </label>
+
                   <EditField
                     label="Phone"
                     name="phone"

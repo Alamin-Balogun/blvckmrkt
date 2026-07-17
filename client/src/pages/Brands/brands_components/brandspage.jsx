@@ -443,10 +443,14 @@ export default function BrandsPage() {
     return matchCat && matchSearch;
   });
 
+  // Exclusive = admin-flagged via Brand.IsExclusive (admin brand drawer).
+  const exclusive = filtered.filter((b) => b.is_exclusive);
+
   // Featured = admin-controlled (active subscription, non-none plan).
-  // The section renders now so the UI is ready; admin wires the backend later.
+  // Excludes exclusive brands so they don't appear in two sections at once.
   const featured = filtered.filter(
     (b) =>
+      !b.is_exclusive &&
       b.subscription_status === "active" &&
       b.subscription_plan &&
       b.subscription_plan !== "none" &&
@@ -454,6 +458,7 @@ export default function BrandsPage() {
   );
   const rest = filtered.filter(
     (b) =>
+      !b.is_exclusive &&
       !(
         b.subscription_status === "active" &&
         b.subscription_plan &&
@@ -617,6 +622,30 @@ export default function BrandsPage() {
               animate={{opacity: 1, y: 0}}
               exit={{opacity: 0}}
               transition={{duration: 0.25}}>
+              {/* ── Exclusive Brands (admin-flagged via Brand.IsExclusive) ── */}
+              {exclusive.length > 0 && (
+                <>
+                  <div className="brands-divider">
+                    <div className="brands-divider-line" />
+                    <span className="brands-divider-label" style={{color: "#eab308"}}>
+                      ★ Exclusive Brands
+                    </span>
+                    <div className="brands-divider-line" />
+                  </div>
+                  <div className="brands-featured">
+                    {exclusive.map((brand, i) => (
+                      <FeaturedCard
+                        key={brand.id}
+                        brand={brand}
+                        i={i}
+                        shopBtnText={shopBtnText}
+                        dropsAvailLabel={dropsAvailLabel}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
+
               {/* ── Featured Brands (admin-controlled — shows when brands have active subscription) ── */}
               {featured.length > 0 && (
                 <>
