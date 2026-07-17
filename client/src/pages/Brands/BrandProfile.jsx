@@ -1,7 +1,8 @@
 import {useState, useEffect} from "react";
-import {useParams, Link} from "react-router-dom";
+import {useParams, Link, useNavigate} from "react-router-dom";
 import Navbar from "../../components/navbar";
 import Footer from "../../components/footer";
+import {getToken} from "../../components/cartcontext";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "https://blvckmrktng.com";
 
@@ -15,6 +16,104 @@ const SOCIALS = [
   {key: "facebook", label: "Facebook", prefix: "https://facebook.com/", icon: "📘"},
   {key: "twitter", label: "Twitter", prefix: "https://twitter.com/", icon: "🐦"},
 ];
+
+function MessageBrandButton({brandId, brandName}) {
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleOpen = () => {
+    if (!getToken()) { navigate("/login"); return; }
+    setOpen(true);
+  };
+
+  const handleSend = async () => {
+    if (!draft.trim() || sending) return;
+    setSending(true);
+    setError("");
+    try {
+      const res = await fetch(`${API_BASE}/api/buyer/messages/${brandId}`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json", Authorization: `Bearer ${getToken()}`},
+        body: JSON.stringify({body: draft.trim()}),
+      });
+      if (!res.ok) throw new Error("Failed to send");
+      setSent(true);
+      setDraft("");
+    } catch {
+      setError("Couldn't send your message. Please try again.");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <>
+      <button
+        onClick={handleOpen}
+        style={{
+          display: "inline-flex", alignItems: "center", gap: 8,
+          background: "transparent", color: "rgba(255,255,255,0.6)", fontSize: 11, fontWeight: 900,
+          letterSpacing: "0.18em", textTransform: "uppercase", padding: "12px 20px",
+          border: "1px solid rgba(255,255,255,0.15)", borderRadius: 8, cursor: "pointer", whiteSpace: "nowrap",
+        }}>
+        Message {brandName}
+      </button>
+
+      {open && (
+        <div
+          style={{position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 999, display: "flex", alignItems: "center", justifyContent: "center", padding: 24}}
+          onClick={() => setOpen(false)}>
+          <div
+            style={{background: "#0d0d0d", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 14, padding: 24, maxWidth: 420, width: "100%"}}
+            onClick={(e) => e.stopPropagation()}>
+            <p style={{color: "#fff", fontSize: 15, fontWeight: 800, margin: "0 0 4px"}}>Message {brandName}</p>
+            {sent ? (
+              <>
+                <p style={{color: "#22c55e", fontSize: 13, margin: "12px 0"}}>✓ Message sent! View it anytime from your dashboard's Messages tab.</p>
+                <button
+                  onClick={() => { setOpen(false); setSent(false); }}
+                  style={{background: "#ef4444", border: "none", borderRadius: 8, padding: "10px 20px", color: "#fff", fontSize: 12, fontWeight: 800, cursor: "pointer"}}>
+                  Close
+                </button>
+              </>
+            ) : (
+              <>
+                <p style={{color: "rgba(255,255,255,0.35)", fontSize: 12, margin: "0 0 14px"}}>They'll be able to reply from their brand dashboard.</p>
+                <textarea
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  placeholder="Ask about sizing, shipping, restocks..."
+                  rows={4}
+                  style={{
+                    width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.04)",
+                    border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "10px 12px",
+                    color: "#fff", fontSize: 12.5, outline: "none", resize: "vertical", marginBottom: 10,
+                  }}
+                />
+                {error && <p style={{color: "#ef4444", fontSize: 11, margin: "0 0 10px"}}>{error}</p>}
+                <div style={{display: "flex", gap: 8, justifyContent: "flex-end"}}>
+                  <button onClick={() => setOpen(false)} style={{background: "none", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "10px 18px", color: "rgba(255,255,255,0.5)", fontSize: 12, cursor: "pointer"}}>
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSend}
+                    disabled={sending || !draft.trim()}
+                    style={{background: "#ef4444", border: "none", borderRadius: 8, padding: "10px 20px", color: "#fff", fontSize: 12, fontWeight: 800, cursor: "pointer", opacity: sending || !draft.trim() ? 0.5 : 1}}>
+                    {sending ? "Sending..." : "Send"}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
 
 function BrandInitials({name}) {
   const initials = (name || "?")
@@ -151,16 +250,19 @@ export default function BrandProfile() {
             </p>
           </div>
 
-          <Link
-            to={`/shop?brand_id=${brand.id}`}
-            style={{
-              display: "inline-flex", alignItems: "center", gap: 8,
-              background: "#ef4444", color: "#fff", fontSize: 11, fontWeight: 900,
-              letterSpacing: "0.18em", textTransform: "uppercase", padding: "12px 24px",
-              textDecoration: "none", borderRadius: 8, whiteSpace: "nowrap",
-            }}>
-            Shop {brand.brand_name} →
-          </Link>
+          <div style={{display: "flex", gap: 10, flexWrap: "wrap"}}>
+            <MessageBrandButton brandId={brand.id} brandName={brand.brand_name} />
+            <Link
+              to={`/shop?brand_id=${brand.id}`}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 8,
+                background: "#ef4444", color: "#fff", fontSize: 11, fontWeight: 900,
+                letterSpacing: "0.18em", textTransform: "uppercase", padding: "12px 24px",
+                textDecoration: "none", borderRadius: 8, whiteSpace: "nowrap",
+              }}>
+              Shop {brand.brand_name} →
+            </Link>
+          </div>
         </div>
 
         {brand.description && (

@@ -30,6 +30,11 @@ export const getOrders = () => req("GET", "/buyer/orders");
 export const getOrder = (id) => req("GET", `/buyer/orders/${id}`);
 export const cancelOrder = (id) => req("POST", `/buyer/orders/${id}/cancel`);
 
+// ── Messages ──────────────────────────────────────────────────────────────────
+export const getConversations = () => req("GET", "/buyer/messages");
+export const getThread = (brandId) => req("GET", `/buyer/messages/${brandId}`);
+export const sendMessage = (brandId, body) => req("POST", `/buyer/messages/${brandId}`, {body});
+
 // ── Addresses ─────────────────────────────────────────────────────────────────
 export const getAddresses = () => req("GET", "/buyer/addresses");
 export const createAddress = (body) => req("POST", "/buyer/addresses", body);

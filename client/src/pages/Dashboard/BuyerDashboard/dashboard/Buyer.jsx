@@ -8,6 +8,7 @@ import Sidebar from "./dashboard_components/sidebar";
 import TopBar from "./dashboard_components/topbar";
 import Overview from "./dashboard_components/overview";
 import Orders from "./Orders";
+import Messages from "./Messages";
 import Wishlist from "./Wishlist";
 import Shop from "./Shop";
 import Addresses from "./Addresses";
@@ -26,6 +27,7 @@ import {
 const PAGE_TITLES = {
   overview: "Overview",
   orders: "My Orders",
+  messages: "Messages",
   wishlist: "Wishlist",
   shop: "Shop",
   addresses: "Addresses",
@@ -657,6 +659,8 @@ export default function BuyerDashboard() {
         return <Overview user={displayUser} onNav={goTo} />;
       case "orders":
         return <Orders />;
+      case "messages":
+        return <Messages />;
       case "wishlist":
         return <Wishlist />;
       case "shop":

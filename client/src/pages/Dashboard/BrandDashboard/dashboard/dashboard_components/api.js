@@ -66,6 +66,11 @@ export const listMyOrders = (params = {}) => {
   return req("GET", `/brand/my-orders${q ? "?" + q : ""}`);
 };
 
+// ── Messages ──────────────────────────────────────────────────────────────────
+export const getConversations = () => req("GET", "/brand/messages");
+export const getThread = (buyerId) => req("GET", `/brand/messages/${buyerId}`);
+export const sendMessage = (buyerId, body) => req("POST", `/brand/messages/${buyerId}`, {body});
+
 // ── Analytics ─────────────────────────────────────────────────────────────────
 export const getBrandAnalytics = () => req("GET", "/brand/analytics");
 

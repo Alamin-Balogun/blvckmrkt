@@ -21,6 +21,7 @@ import TopBar from "../dashboard/dashboard_components/topbar";
 const Overview      = lazy(() => import("../dashboard/dashboard_components/overview"));
 const Products      = lazy(() => import("./Products"));
 const Orders        = lazy(() => import("./Orders"));
+const Messages      = lazy(() => import("./Messages"));
 const Analytics     = lazy(() => import("./Analytics"));
 const Settings      = lazy(() => import("./Settings"));
 const Shop          = lazy(() => import("./Shop"));
@@ -37,6 +38,7 @@ const PAGE_TITLES = {
   shop:          "Shop View",
   products:      "Products",
   orders:        "Orders",
+  messages:      "Messages",
   analytics:     "Analytics",
   settings:      "Settings",
   wishlist:      "Wishlist",
@@ -1236,6 +1238,8 @@ useEffect(() => {
             return <Shop brandID={brand?.brand_id} onNav={goTo} />;
           case "orders":
             return <Orders />;
+          case "messages":
+            return <Messages />;
           case "analytics":
             return <Analytics />;
           case "wishlist":

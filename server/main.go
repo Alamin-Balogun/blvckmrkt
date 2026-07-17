@@ -99,6 +99,9 @@ func main() {
 		// NOTIFICATIONS
 		&models.Notification{},
 
+		// BUYER <-> BRAND MESSAGING
+		&models.Message{},
+
 		// ✅ SUBSCRIPTION PLANS
 		&models.SubscriptionPlanConfig{},
 

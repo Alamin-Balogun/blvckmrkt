@@ -138,6 +138,11 @@ func Register(r *gin.Engine) {
 		buyer.GET("/orders/:id",         handlers.GetOrder)
 		buyer.POST("/orders/:id/cancel", handlers.CancelOrder)
 
+		// Buyer <-> brand messaging
+		buyer.GET("/messages",            handlers.BuyerListConversations)
+		buyer.GET("/messages/:brandId",   handlers.BuyerGetThread)
+		buyer.POST("/messages/:brandId",  handlers.BuyerSendMessage)
+
 		buyer.GET("/addresses",               handlers.ListAddresses)
 		buyer.POST("/addresses",              handlers.CreateAddress)
 		buyer.PUT("/addresses/:id",           handlers.UpdateAddress)
@@ -195,6 +200,11 @@ brandNoGuard := api.Group("/brand", middleware.Auth(), middleware.RequireBrand()
 		brand.GET("/orders/:id",          handlers.BrandGetOrder)
 		brand.PATCH("/orders/:id/status", handlers.BrandUpdateOrderStatus)
 		brand.GET("/my-orders",           handlers.BrandGetMyOrders)
+
+		// Buyer <-> brand messaging
+		brand.GET("/messages",           handlers.BrandListConversations)
+		brand.GET("/messages/:buyerId",  handlers.BrandGetThread)
+		brand.POST("/messages/:buyerId", handlers.BrandSendMessage)
 
 		brand.GET("/analytics", handlers.BrandAnalytics)
 
