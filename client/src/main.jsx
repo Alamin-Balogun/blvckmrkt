@@ -46,8 +46,6 @@ const Authentication         = lazy(() => import("./pages/TermsPrivacy/Authentic
 const Return                 = lazy(() => import("./pages/TermsPrivacy/Returnpage"));
 const Brandpartnershipagreement = lazy(() => import("./pages/TermsPrivacy/Brandpartnershipagreement"));
 const Shippingpolicy         = lazy(() => import("./pages/TermsPrivacy/Shippingpolicypage"));
-const SubscriptionPage       = lazy(() => import("./pages/Subscription/Subscriptionpage"));
-const SubscriptionCheckout   = lazy(() => import("./pages/Subscription/Subscriptioncheckout"));
 const AdminDashboard         = lazy(() => import("./pages/Dashboard/AdminDashboard/dashboard/Admin"));
 const BuyerDashboard         = lazy(() => import("./pages/Dashboard/BuyerDashboard/dashboard/Buyer"));
 const BrandUpgradeForm       = lazy(() => import("./pages/Upgrade/BrandUpgradeForm"));
@@ -129,10 +127,7 @@ createRoot(document.getElementById("root")).render(
                 <Route path="/return"                    element={<Return />} />
                 <Route path="/shipping-policy"           element={<Shippingpolicy />} />
                 <Route path="/Authentication"            element={<Authentication />} />
-                {/* Subscription */}
                 <Route path="/brand-partnership-agreement" element={<Brandpartnershipagreement />} />
-                <Route path="/subscribe"                 element={<SubscriptionPage />} />
-                <Route path="/subscribe/checkout"        element={<SubscriptionCheckout />} />
                 {/* Dashboards */}
                 <Route path="/dashboard/admin"           element={<AdminDashboard />} />
                 <Route path="/dashboard/buyer"           element={<DashboardGuard required="user" redirect="/dashboard/brand"><BuyerDashboard /></DashboardGuard>} />

@@ -68,8 +68,7 @@ func GetPublicBrands(c *gin.Context) {
 			AND p.status     = 'active'
 			AND p.deleted_at IS NULL
 		WHERE b.deleted_at IS NULL
-          AND b.verification_status IN ('verified', 'pending')
-          AND b.subscription_status  IN ('active', 'trial')
+          AND b.verification_status = 'verified'
 		GROUP BY
 			b.id, b.display_id, b.brand_name, b.slug, b.description,
 			b.logo_url, b.banner_url, b.website, b.category,
@@ -78,12 +77,6 @@ func GetPublicBrands(c *gin.Context) {
 		ORDER BY
 			CASE WHEN b.featured_rank IS NULL THEN 1 ELSE 0 END ASC,
 			b.featured_rank ASC,
-			CASE
-				WHEN b.subscription_status = 'active'
-				 AND b.subscription_plan  != 'none'
-				 AND b.subscription_plan  != ''
-				THEN 0 ELSE 1
-			END ASC,
 			b.brand_name ASC
 	`).Scan(&brands)
 

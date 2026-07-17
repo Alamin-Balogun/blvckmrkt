@@ -164,11 +164,6 @@ export const getBrandBankAccount = () => req("GET", "/brand/bank-account");
 export const createBrandBankAccount = (body) => req("POST", "/brand/bank-account", body);
 export const updateBrandBankAccount = (body) => req("PATCH", "/brand/bank-account", body);
 
-// ── Subscription ──────────────────────────────────────────────────────────────
-export const getSubscriptionPlans   = () => req("GET", "/subscription-plans");
-export const getSubscriptionStatus  = () => req("GET", "/subscription/status");
-export const activateSubscription   = (body) => req("POST", "/subscription/activate", body);
-
 export const getPlatformSettings = () => req("GET", "/brand/platform-settings");
 
 // ── Delete own brand account (stored in audit log, restorable by admin) ───────

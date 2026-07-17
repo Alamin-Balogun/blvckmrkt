@@ -413,16 +413,11 @@ export default function BrandsPage() {
   const dropsAvailLabel = useBrandsContent("drops_avail_label", "products available");
 
   useEffect(() => {
+    // GET /api/brands already only returns verified brands — no further
+    // filtering needed here (the subscription feature this used to also
+    // check for has been removed).
     fetchBrands().then((data) => {
-      // Show brands where:
-      //   verification_status is "verified" or "pending"  AND
-      //   subscription_status is "active" or "trial"
-      const visible = data.filter(
-        (b) =>
-          (b.verification_status === "verified" || b.verification_status === "pending") &&
-          (b.subscription_status === "active" || b.subscription_status === "trial"),
-      );
-      setBrands(visible);
+      setBrands(data);
       setLoading(false);
     });
   }, []);
@@ -446,26 +441,10 @@ export default function BrandsPage() {
   // Exclusive = admin-flagged via Brand.IsExclusive (admin brand drawer).
   const exclusive = filtered.filter((b) => b.is_exclusive);
 
-  // Featured = admin-controlled (active subscription, non-none plan).
+  // Featured = admin-pinned via Brand.FeaturedRank (admin brand drawer).
   // Excludes exclusive brands so they don't appear in two sections at once.
-  const featured = filtered.filter(
-    (b) =>
-      !b.is_exclusive &&
-      b.subscription_status === "active" &&
-      b.subscription_plan &&
-      b.subscription_plan !== "none" &&
-      b.subscription_plan !== "",
-  );
-  const rest = filtered.filter(
-    (b) =>
-      !b.is_exclusive &&
-      !(
-        b.subscription_status === "active" &&
-        b.subscription_plan &&
-        b.subscription_plan !== "none" &&
-        b.subscription_plan !== ""
-      ),
-  );
+  const featured = filtered.filter((b) => !b.is_exclusive && b.featured_rank != null);
+  const rest = filtered.filter((b) => !b.is_exclusive && b.featured_rank == null);
 
   return (
     <section

@@ -8,12 +8,11 @@ const SECTIONS = [
   { id: "delays",          num: "03", title: "Delivery Delays & Communication" },
   { id: "compensation",    num: "04", title: "Fulfillment Period & Compensation" },
   { id: "escrow",          num: "05", title: "Payment Handling & Escrow" },
-  { id: "subscription",    num: "06", title: "Monthly Subscription" },
-  { id: "platform-fee",    num: "07", title: "Platform Fee & Investment" },
-  { id: "responsibilities",num: "08", title: "Brand Responsibilities" },
-  { id: "enforcement",     num: "09", title: "Enforcement & Compliance" },
-  { id: "amendments",      num: "10", title: "Amendments" },
-  { id: "acknowledgment",  num: "11", title: "Agreement Acknowledgment" },
+  { id: "platform-fee",    num: "06", title: "Platform Fee & Investment" },
+  { id: "responsibilities",num: "07", title: "Brand Responsibilities" },
+  { id: "enforcement",     num: "08", title: "Enforcement & Compliance" },
+  { id: "amendments",      num: "09", title: "Amendments" },
+  { id: "acknowledgment",  num: "10", title: "Agreement Acknowledgment" },
 ];
 
 function SectionBlock({ id, num, title, children, isRead, onRead }) {
@@ -119,7 +118,7 @@ function SigningTerminal({ readCount, total, onSigned, registeredBrandName, user
     addLine("> Initiating partnership agreement protocol...", 0);
     addLine(`> Brand identity confirmed: ${brandName.toUpperCase()}`, 600);
     addLine("> Verifying agreement conditions...", 1200);
-    addLine("> All 11 clauses reviewed ✓", 1800);
+    addLine("> All 10 clauses reviewed ✓", 1800);
     addLine("> Escrow policy acknowledged ✓", 2200);
     addLine("> Platform fee structure accepted ✓", 2600);
     addLine("> Subscription terms confirmed ✓", 3000);
@@ -352,25 +351,14 @@ function SigningTerminal({ readCount, total, onSigned, registeredBrandName, user
 }
 
 // ── Agreement Sealed ──────────────────────────────────────────────────────────
-// ── Agreement Sealed ──────────────────────────────────────────────────────────
-function AgreementSealed({ brandName, onProceed, planData }) {
+function AgreementSealed({ brandName }) {
   const navigate = useNavigate();
 
-  // ✅ Add debug log to confirm what planData contains
-  useEffect(() => {
-    console.log("[AgreementSealed] planData received:", planData);
-  }, [planData]);
-
-const handleReservePlan = () => {
-    if (planData) {
-      navigate("/subscribe/checkout", { state: { plan: planData } });
-    } else {
-      navigate("/subscribe/checkout");
-    }
+  const handleGoToDashboard = () => {
+    navigate("/dashboard/brand");
   };
 
   const handleBackHome = () => {
-    console.log("[AgreementSealed] Back to home clicked");
     navigate("/");
   };
 
@@ -427,9 +415,8 @@ const handleReservePlan = () => {
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.1 }}
         style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
 
-        {/* ✅ Reserve Your Plan */}
         <motion.button
-          onClick={handleReservePlan}
+          onClick={handleGoToDashboard}
           whileHover={{ scale: 1.03 }}
           whileTap={{ scale: 0.97 }}
           style={{
@@ -440,7 +427,7 @@ const handleReservePlan = () => {
           onMouseEnter={e => (e.currentTarget.style.background = "#dc2626")}
           onMouseLeave={e => (e.currentTarget.style.background = "#ef4444")}
         >
-          Reserve Your Plan →
+          Go To Dashboard →
         </motion.button>
 
         {/* ✅ Back to Home */}
@@ -473,7 +460,6 @@ const handleReservePlan = () => {
 export default function BrandPartnershipAgreement() {
   const navigate  = useNavigate();
   const location  = useLocation();
-  const planData           = location.state?.plan ?? null;
   const brandNameFromState = location.state?.brandName ?? "";
 
   // ✅ Read token immediately using the correct key from authcontext
@@ -494,9 +480,9 @@ export default function BrandPartnershipAgreement() {
   const markRead  = (id) => setReadSections(prev => new Set([...prev, id]));
   const readCount = readSections.size;
 
-  // ── Guard: if already signed, skip straight to checkout ──────────────────
+  // ── Guard: if already signed, skip straight to the brand dashboard ────────
   useEffect(() => {
-    if (!userToken || !planData) return;
+    if (!userToken) return;
 
     fetch(`${import.meta.env.VITE_API_URL}/api/brand/profile`, {
       headers: { Authorization: `Bearer ${userToken}` },
@@ -509,7 +495,7 @@ export default function BrandPartnershipAgreement() {
           false;
 
         if (alreadySigned) {
-          navigate("/subscribe/checkout", { state: { plan: planData } });
+          navigate("/dashboard/brand");
         }
       })
       .catch(() => {});
@@ -568,10 +554,6 @@ export default function BrandPartnershipAgreement() {
     }
   }, []);
 
-  const handleProceedToCheckout = () => {
-    if (planData) navigate("/subscribe/checkout", { state: { plan: planData } });
-    else navigate("/subscribe");
-  };
 
   // ── JS-sticky TOC ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -719,7 +701,7 @@ export default function BrandPartnershipAgreement() {
         <main className="bp-main" style={{ flex:1, minWidth:0, padding:"clamp(2rem,4vw,4rem) clamp(1.5rem,4vw,5rem)", fontFamily:"'DM Sans',sans-serif" }}>
 
           <Callout label="Before You Begin" color="yellow">
-            This document governs the relationship between <strong style={{ color:"#fff" }}>Blvckmrkt</strong> ("the Platform") and you ("the Brand"). Scroll through each clause carefully — your reading progress is tracked. You must review all 11 clauses before you can execute the agreement.
+            This document governs the relationship between <strong style={{ color:"#fff" }}>Blvckmrkt</strong> ("the Platform") and you ("the Brand"). Scroll through each clause carefully — your reading progress is tracked. You must review all 10 clauses before you can execute the agreement.
           </Callout>
 
           <SectionBlock id="authenticity" num="01" title="Product Authenticity & Listing Requirements" isRead={readSections.has("authenticity")} onRead={markRead}>
@@ -751,36 +733,30 @@ export default function BrandPartnershipAgreement() {
             <Callout label="Escrow Protects Everyone">This system is not about distrust — it's about building a marketplace where buyers feel safe spending money on brands they've never purchased from before.</Callout>
           </SectionBlock>
 
-          <SectionBlock id="subscription" num="06" title="Monthly Subscription" isRead={readSections.has("subscription")} onRead={markRead}>
-            <StatCards cards={[{label:"// Monthly Fee",value:"₦35K",sub:"per month"},{label:"// Billing",value:"Manual",sub:"no auto-charge"},{label:"// Cancellation",value:"Anytime",sub:"after monthly sub"}]} />
-            <p className="bp-para">To maintain an active storefront on BLVCKMRKT, brands are charged a subscription fee of <strong style={{ color:"#fff" }}>₦35,000 per month</strong>.</p>
-            <RuleList items={["Subscription billing is manual — we do not support automatic or unreminded recurring charges.","Subscription can be cancelled at any time following the end of the current billing month.","Brands will be notified in advance of any changes to the subscription price.","Non-payment will result in temporary deactivation of the brand storefront."]} />
-          </SectionBlock>
-
-          <SectionBlock id="platform-fee" num="07" title="Platform Fee & Investment Policy" isRead={readSections.has("platform-fee")} onRead={markRead}>
+          <SectionBlock id="platform-fee" num="06" title="Platform Fee & Investment Policy" isRead={readSections.has("platform-fee")} onRead={markRead}>
             <StatCards cards={[{label:"// Standard Fee",value:"12%",sub:"per sale"},{label:"// Model",value:"Growth",sub:"reinvestment focused"},{label:"// Negotiable",value:"Yes",sub:"case by case"}]} />
             <p className="bp-para">BLVCKMRKT operates a unique, growth-focused revenue model. Rather than extracting profit, we reinvest platform fees directly back into driving sales for the brands on the platform.</p>
             <RuleList items={["A standard 12% platform fee applies to each sale made through the platform.","Instead of collecting this as direct profit, BLVCKMRKT may reinvest it as customer discounts, promotional subsidies, or marketing support for the Brand.","The 12% rate is negotiable and may vary based on brand category, volume, or strategic terms.","Exceptions may apply at the platform's discretion."]} />
             <Callout label="The Growth Philosophy" color="green">Our fee model is designed to grow your brand's presence, not just take a cut. When you win, the platform wins.</Callout>
           </SectionBlock>
 
-          <SectionBlock id="responsibilities" num="08" title="Brand Responsibilities" isRead={readSections.has("responsibilities")} onRead={markRead}>
+          <SectionBlock id="responsibilities" num="07" title="Brand Responsibilities" isRead={readSections.has("responsibilities")} onRead={markRead}>
             <p className="bp-para">As a BLVCKMRKT partner, you represent not just your brand but the platform's reputation. The following responsibilities are non-negotiable commitments:</p>
             <RuleList items={["Maintain honest, accurate, and timely communication with customers at all times.","Deliver products within agreed timelines and proactively notify buyers of any changes.","Provide and maintain a functional, reliable delivery system throughout your partnership.","Uphold the reputation and integrity of the BLVCKMRKT platform in all customer interactions.","Resolve customer disputes fairly and in good faith, escalating to BLVCKMRKT where necessary."]} />
           </SectionBlock>
 
-          <SectionBlock id="enforcement" num="09" title="Enforcement & Compliance" isRead={readSections.has("enforcement")} onRead={markRead}>
+          <SectionBlock id="enforcement" num="08" title="Enforcement & Compliance" isRead={readSections.has("enforcement")} onRead={markRead}>
             <p className="bp-para">Non-compliance with the terms of this agreement will be taken seriously. The platform reserves the right to act swiftly to protect buyers and the marketplace.</p>
             <RuleList items={["Temporary suspension — for minor or first-time violations pending review.","Permanent removal — for repeated breaches, fraud, or gross misconduct.","Withholding of payments — where active disputes or fraud investigations are in progress.","All enforcement actions will be communicated to the Brand with a clear explanation."]} />
             <Callout label="Fair Process">We are not trigger-happy — enforcement follows a fair review process. However, buyer protection is our highest priority and will always take precedence.</Callout>
           </SectionBlock>
 
-          <SectionBlock id="amendments" num="10" title="Amendments" isRead={readSections.has("amendments")} onRead={markRead}>
+          <SectionBlock id="amendments" num="09" title="Amendments" isRead={readSections.has("amendments")} onRead={markRead}>
             <p className="bp-para">BLVCKMRKT is a growing platform and its policies will evolve alongside it. The platform reserves the right to modify these terms as circumstances change.</p>
             <RuleList items={["BLVCKMRKT reserves the right to modify these terms as the platform evolves.","Brands will be notified of any significant updates in advance.","Continued operation on the platform following an amendment constitutes acceptance of the updated terms.","For material changes, Brands will be given a reasonable window to review before the amendment takes effect."]} />
           </SectionBlock>
 
-          <SectionBlock id="acknowledgment" num="11" title="Agreement Acknowledgment" isRead={readSections.has("acknowledgment")} onRead={markRead}>
+          <SectionBlock id="acknowledgment" num="10" title="Agreement Acknowledgment" isRead={readSections.has("acknowledgment")} onRead={markRead}>
             <p className="bp-para">By executing this agreement below, you confirm that you have read, understood, and agreed to all terms outlined in this document.</p>
             <div style={{ background:"#0d0d0d", border:"1px solid rgba(255,255,255,0.08)", padding:"20px 24px", marginBottom:20 }}>
               <p style={{ fontFamily:"'Space Mono',monospace", fontSize:9, color:"rgba(255,255,255,0.2)", letterSpacing:"0.15em", marginBottom:12 }}>// AGREEMENT TERMS</p>
@@ -798,19 +774,12 @@ export default function BrandPartnershipAgreement() {
   <SigningTerminal
     readCount={readCount}
     total={SECTIONS.length}
-    onSigned={(name) => {
-      console.log("[Page] onSigned called with:", name, "planData:", planData); // ✅ debug
-      setSignedBrand(name);
-    }}
+    onSigned={(name) => setSignedBrand(name)}
     registeredBrandName={registeredBrandName}
     userToken={userToken}
   />
 ) : (
-  <AgreementSealed
-    brandName={signedBrand}
-    planData={planData} 
-    onProceed={handleProceedToCheckout}
-  />
+  <AgreementSealed brandName={signedBrand} />
 )}
 
           <div style={{ height:80 }} />

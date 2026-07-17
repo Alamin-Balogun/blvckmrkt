@@ -6712,10 +6712,11 @@ function NewsletterCampaignsTab() {
 
 // ── Root AdminSubscriptions shell ─────────────────────────────────────────────
 export function AdminSubscriptions() {
-  const [tab, setTab] = useState("subscriptions");
+  // Brand billing subscriptions (Plan Definitions / Subscriptions tabs) were
+  // removed along with the subscription feature — this now only manages
+  // email newsletter campaigns/subscribers, which are unrelated.
+  const [tab, setTab] = useState("campaigns");
   const TABS = [
-    {id: "plans_def", label: "Plan Definitions"},
-    {id: "subscriptions", label: "Subscriptions"},
     {id: "campaigns", label: "Newsletters"},
     {id: "subscribers", label: "Subscribers"},
   ];
@@ -6761,8 +6762,6 @@ export function AdminSubscriptions() {
           animate={{opacity: 1, y: 0}}
           exit={{opacity: 0}}
           transition={{duration: 0.15}}>
-          {tab === "plans_def" && <PlansTab />}
-          {tab === "subscriptions" && <PlanSubscriptionsTab />}
           {tab === "campaigns" && <NewsletterCampaignsTab />}
           {tab === "subscribers" && <NewsletterTab />}
         </motion.div>

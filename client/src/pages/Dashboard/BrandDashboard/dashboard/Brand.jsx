@@ -1,5 +1,4 @@
 import { useState, useEffect, lazy, Suspense } from "react";
-import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../../../Auth/context/authcontext";
 import ImageUpload from "../../../../components/ImageUpload";
@@ -899,24 +898,24 @@ function AccessRestricted({ message, onLogout }) {
   );
 }
 
-// ── Subscription Blocked Screen ───────────────────────────────────────────────
-function SubscriptionBlocked({ status, onLogout }) {
-  const navigate = useNavigate();
-
+// ── Verification Blocked Screen ───────────────────────────────────────────────
+// Shown while RequireVerifiedBrand (backend) is rejecting dashboard requests —
+// i.e. the brand's verification_status isn't "verified" yet.
+function VerificationBlocked({ status, onLogout }) {
   const config = {
-    none: {
+    pending: {
       icon: "⏳",
       iconColor: "#f59e0b",
       iconBg: "rgba(245,158,11,0.1)",
       iconBorder: "rgba(245,158,11,0.3)",
-      badge: "Payment Pending Verification",
+      badge: "Verification Pending",
       badgeColor: "rgba(245,158,11,0.3)",
       badgeText: "#f59e0b",
-      headline: ["PAYMENT UNDER", "REVIEW"],
+      headline: ["BRAND UNDER", "REVIEW"],
       accentWord: 1,
       accentColor: "#f59e0b",
-      body: "Your bank transfer has been received and is currently being reviewed by our team. This process typically takes 24–72 hours and will not exceed 7 business days. You'll receive a confirmation email at your registered address once your subscription is activated.",
-      tip: "Do NOT make another payment. If it's been over 7 business days, contact us at blvckmrkt.market@gmail.com with your submission reference.",
+      body: "Your brand application is currently being reviewed by our team. This process typically takes a few business days. You'll receive a confirmation email at your registered address once your brand is verified and your dashboard unlocks.",
+      tip: "If this takes longer than 7 business days, contact us at blvckmrkt.market@gmail.com.",
       tipColor: "rgba(245,158,11,0.15)",
       tipBorder: "rgba(245,158,11,0.25)",
       tipTextColor: "rgba(245,158,11,0.8)",
@@ -924,49 +923,29 @@ function SubscriptionBlocked({ status, onLogout }) {
       secondaryLabel: "Log Out",
       secondaryAction: onLogout,
     },
-    expired: {
-      icon: "📅",
+    suspended: {
+      icon: "🚫",
       iconColor: "#ef4444",
       iconBg: "rgba(239,68,68,0.1)",
       iconBorder: "rgba(239,68,68,0.3)",
-      badge: "Subscription Expired",
+      badge: "Brand Suspended",
       badgeColor: "rgba(239,68,68,0.2)",
       badgeText: "#ef4444",
-      headline: ["YOUR PLAN HAS", "EXPIRED"],
+      headline: ["BRAND ACCOUNT", "SUSPENDED"],
       accentWord: 1,
       accentColor: "#ef4444",
-      body: "Your BLVCKMRKT subscription has reached its end date and your dashboard access has been paused. Renew your plan to instantly restore full access to your brand studio, products, orders, and analytics.",
-      tip: "Your products and data are safe — nothing is deleted. Renewing restores everything instantly.",
+      body: "Your brand's dashboard access has been suspended. Your products and data are safe and nothing has been deleted. Contact our team to find out why and how to resolve it.",
+      tip: "Reach us at blvckmrkt.market@gmail.com with your brand name for details.",
       tipColor: "rgba(255,255,255,0.03)",
       tipBorder: "rgba(255,255,255,0.08)",
       tipTextColor: "rgba(255,255,255,0.4)",
-      primaryBtn: { label: "Renew Subscription →", action: () => navigate("/subscribe") },
-      secondaryLabel: "Log Out",
-      secondaryAction: onLogout,
-    },
-    cancelled: {
-      icon: "🚫",
-      iconColor: "#64748b",
-      iconBg: "rgba(100,116,139,0.1)",
-      iconBorder: "rgba(100,116,139,0.3)",
-      badge: "Subscription Cancelled",
-      badgeColor: "rgba(100,116,139,0.15)",
-      badgeText: "#64748b",
-      headline: ["SUBSCRIPTION", "CANCELLED"],
-      accentWord: 1,
-      accentColor: "#94a3b8",
-      body: "Your BLVCKMRKT subscription has been cancelled and your dashboard access has been revoked. If this was a mistake or you'd like to come back, you can resubscribe at any time — your brand profile and history will still be here waiting.",
-      tip: "Changed your mind? Resubscribing is quick and your previous brand data remains intact.",
-      tipColor: "rgba(255,255,255,0.03)",
-      tipBorder: "rgba(255,255,255,0.08)",
-      tipTextColor: "rgba(255,255,255,0.4)",
-      primaryBtn: { label: "Resubscribe Now →", action: () => navigate("/subscribe") },
+      primaryBtn: null,
       secondaryLabel: "Log Out",
       secondaryAction: onLogout,
     },
   };
 
-  const c = config[status] || config.none;
+  const c = config[status] || config.pending;
 
   return (
     <div style={{
@@ -1071,7 +1050,7 @@ function SubscriptionBlocked({ status, onLogout }) {
             alignItems: "flex-start",
           }}>
             <span style={{ fontSize: "0.95rem", flexShrink: 0, marginTop: 1 }}>
-              {status === "none" ? "⚠️" : "💡"}
+              {status === "suspended" ? "⚠️" : "💡"}
             </span>
             <p style={{
               color: c.tipTextColor,
@@ -1153,17 +1132,17 @@ export default function BrandDashboard() {
   const [selectedNotifId, setSelectedNotifId] = useState(null);
   const [showProfilePop, setShowProfilePop]   = useState(false);
 const [showLogoutModal, setShowLogoutModal] = useState(false);
-const [subscriptionStatus, setSubscriptionStatus] = useState(null);
+const [verificationStatus, setVerificationStatus] = useState(null);
 
-const BLOCKED_STATUSES = ["none", "expired", "cancelled"];
+const BLOCKED_STATUSES = ["pending", "suspended"];
 
 useEffect(() => {
   getBrandProfile()
     .then((b) => {
       setBrand(b);
-      const status = b?.subscription_status || "none";
-      setSubscriptionStatus(status);
-      // Only show profile popup if subscription allows dashboard access
+      const status = b?.verification_status || "pending";
+      setVerificationStatus(status);
+      // Only show profile popup if verification allows dashboard access
       if (!BLOCKED_STATUSES.includes(status) && getMissingFields(b).length > 0) {
         setTimeout(() => setShowProfilePop(true), 800);
       }
@@ -1271,8 +1250,8 @@ useEffect(() => {
 
 if (accessError) return <AccessRestricted message={accessError} onLogout={logout} />;
 
-if (!loading && subscriptionStatus && BLOCKED_STATUSES.includes(subscriptionStatus)) {
-  return <SubscriptionBlocked status={subscriptionStatus} onLogout={logout} />;
+if (!loading && verificationStatus && BLOCKED_STATUSES.includes(verificationStatus)) {
+  return <VerificationBlocked status={verificationStatus} onLogout={logout} />;
 }
 
   return (

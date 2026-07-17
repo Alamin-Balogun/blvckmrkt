@@ -7,7 +7,6 @@ import BrandsMarquee from "./home_components/brandsmarquee";
 // import Testimonials from "./home_components/testimonials";
 import FeaturedCollections from "./home_components/featuredcollections";
 import PromoBanner from "./home_components/promobanner";
-import SubscriptionPlans from "./home_components/subscriptionplans";
 import BlogSection from "./home_components/blogsection";
 import Services from "./home_components/services";
 import Newsletter from "../../components/newsletter";
@@ -27,7 +26,6 @@ export default function Home() {
         {/* <Testimonials /> */}
         <FeaturedCollections />
         <PromoBanner />
-        <SubscriptionPlans />
         <BlogSection />
         <Services />
         <Newsletter />

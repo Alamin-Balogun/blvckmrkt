@@ -2585,7 +2585,7 @@ onVerified={(data) => {
   }
 
   const dest =
-    data.data.user?.account_type === "brand" ? "/subscribe" : "/dashboard/buyer";
+    data.data.user?.account_type === "brand" ? "/brand-partnership-agreement" : "/dashboard/buyer";
   setTimeout(() => navigate(dest), REDIRECT_DELAY);
 }}
               />

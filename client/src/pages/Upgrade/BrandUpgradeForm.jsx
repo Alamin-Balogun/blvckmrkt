@@ -61,7 +61,7 @@ export default function BrandUpgradeForm() {
         return;
       }
 
-// ✅ Save brand name so agreement/subscribe page can read it
+// ✅ Save brand name so the partnership agreement page can read it
 localStorage.setItem("brand_name", form.brandName.trim());
 
 // ✅ Update token — MUST happen before redirect so auth context re-reads it
@@ -82,7 +82,11 @@ if (data.data?.token) {
 // ✅ HARD redirect — forces full app remount so auth context
 // re-reads the new brand token and renders brand sidebar/dashboard
 // DO NOT use navigate() here — it keeps the old auth state in memory
-window.location.href = `/subscribe?brandName=${encodeURIComponent(form.brandName.trim())}&fromUpgrade=true`;
+// Straight to the partnership agreement — the subscription/plan-picking
+// step this used to go through has been removed. The agreement page
+// always re-fetches the current registered brand name itself, so no
+// brandName needs to be carried across this redirect.
+window.location.href = `/brand-partnership-agreement`;
 
     } catch {
       setApiError("Cannot reach the server. Please check your connection.");
@@ -180,9 +184,7 @@ window.location.href = `/subscribe?brandName=${encodeURIComponent(form.brandName
         }}>
           {[
             { num: "01", label: "Brand Info", active: true },
-            { num: "02", label: "Pick Plan", active: false },
-            { num: "03", label: "Agreement", active: false },
-            { num: "04", label: "Payment", active: false },
+            { num: "02", label: "Agreement", active: false },
           ].map((s, i) => (
             <div key={i} style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <div style={{
@@ -207,7 +209,7 @@ window.location.href = `/subscribe?brandName=${encodeURIComponent(form.brandName
                   {s.label}
                 </span>
               </div>
-              {i < 3 && (
+              {i < 1 && (
                 <div style={{ width: 16, height: 1, background: "rgba(255,255,255,0.1)" }} />
               )}
             </div>
@@ -392,7 +394,7 @@ window.location.href = `/subscribe?brandName=${encodeURIComponent(form.brandName
           color: "rgba(255,255,255,0.15)", textAlign: "center",
           marginTop: 16, letterSpacing: "0.1em",
         }}>
-          // Your account type will be converted after you complete payment
+          // Your account converts to a brand account immediately — next you'll sign the partnership agreement
         </p>
       </motion.div>
 

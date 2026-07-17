@@ -26,9 +26,6 @@ func Register(r *gin.Engine) {
 	// ── Image upload (any logged-in account) ───────────────────────────────────
 	api.POST("/upload", middleware.Auth(), handlers.UploadImage)
 
-	// ── Subscription Plans (public) ────────────────────────────────────────────
-	api.GET("/subscription-plans", handlers.GetPublicSubscriptionPlans)
-
 	// ── Auth (public) ──────────────────────────────────────────────────────────
 	auth := api.Group("/auth")
 	{
@@ -164,15 +161,7 @@ func Register(r *gin.Engine) {
 		buyer.DELETE("/follows/:brandId", handlers.UnfollowBrand)
 	}
 
-	// ── Subscription ────────────────────────────────────────────────────────────
-	sub := api.Group("/subscription", middleware.Auth())
-	{
-		sub.POST("/verify-billing", handlers.VerifyBilling)
-		sub.POST("/activate",       handlers.ActivateSubscription)
-		sub.GET("/status",          handlers.GetSubscriptionStatus)
-	}
-
-	// ── Brand routes that don't require an active subscription ───────────────────
+	// ── Brand routes that don't require verification ──────────────────────────────
 brandNoGuard := api.Group("/brand", middleware.Auth(), middleware.RequireBrand())
 {
     brandNoGuard.POST("/partnership/sign", handlers.SignPartnershipAgreement)
@@ -182,7 +171,7 @@ brandNoGuard := api.Group("/brand", middleware.Auth(), middleware.RequireBrand()
 }
 
 	// ── Brand dashboard ─────────────────────────────────────────────────────────
-	brand := api.Group("/brand", middleware.Auth(), middleware.RequireBrand(), middleware.SubscriptionGuard(),)
+	brand := api.Group("/brand", middleware.Auth(), middleware.RequireBrand(), middleware.RequireVerifiedBrand())
 	{
 		brand.GET("/platform-settings", handlers.BrandGetPlatformSettings)
 

@@ -58,7 +58,6 @@ func RegisterAdmin(r *gin.Engine) {
 		api.GET("/brands/:id",                        handlers.AdminGetBrand)
 		api.PATCH("/brands/:id",                      handlers.AdminUpdateBrand)
 		api.PATCH("/brands/:id/verification",         handlers.AdminUpdateBrandVerification)
-		api.PATCH("/brands/:id/subscription",         handlers.AdminUpdateBrandSubscription)
 		api.PATCH("/brands/:id/commission",           handlers.AdminUpdateBrandCommission)
 		api.DELETE("/brands/:id",                     handlers.AdminDeleteBrand)
 		api.POST("/brands/:id/approve",               handlers.AdminApproveBrand)
@@ -128,18 +127,6 @@ api.POST("/bank-accounts/:id/unverify", handlers.AdminUnverifyBankAccount)
 		api.GET("/notifications",        handlers.AdminListNotifications)
 		api.POST("/notifications",       handlers.AdminSendNotification)
 		api.DELETE("/notifications/:id", handlers.AdminDeleteNotification)
-
-		// ── Subscription Management ───────────────────────────────────────────
-		// Brand subscriptions
-		api.GET("/subscriptions",       handlers.AdminListSubscriptions)
-		api.PATCH("/subscriptions/:id", handlers.AdminUpdateSubscription)
-
-		// Subscription plan definitions
-		api.GET("/subscription-plans",        handlers.AdminListSubscriptionPlans)
-		api.POST("/subscription-plans",       handlers.AdminCreateSubscriptionPlan)
-		api.GET("/subscription-plans/:id",    handlers.AdminGetSubscriptionPlan)
-		api.PUT("/subscription-plans/:id",    handlers.AdminUpdateSubscriptionPlan)
-		api.DELETE("/subscription-plans/:id", handlers.AdminDeleteSubscriptionPlan)
 
 		// ── Newsletter Management ─────────────────────────────────────────────
 		// Newsletter subscribers

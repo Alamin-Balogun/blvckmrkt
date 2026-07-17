@@ -15,7 +15,6 @@ const eligibleBrandsSubquery = `(
 	SELECT id FROM brands
 	WHERE deleted_at         IS NULL
 	  AND verification_status = 'verified'
-	  AND subscription_status IN ('active', 'trial')
 )`
 
 // ── ProductSummary ────────────────────────────────────────────────────────────
@@ -83,7 +82,6 @@ func ListProducts(c *gin.Context) {
 			JOIN brands __b ON __b.id = products.brand_id
 			  AND __b.deleted_at         IS NULL
 			  AND __b.verification_status = 'verified'
-			  AND __b.subscription_status IN ('active','trial')
 		`).
 		Where("products.status = ? AND products.deleted_at IS NULL", models.ProductActive).
 		Preload("Images").
@@ -382,7 +380,6 @@ func GetShopCounts(c *gin.Context) {
 		JOIN brands b ON b.id = p.brand_id
 		  AND b.deleted_at         IS NULL
 		  AND b.verification_status = 'verified'
-		  AND b.subscription_status IN ('active', 'trial')
 		WHERE p.status     = 'active'
 		  AND p.deleted_at IS NULL
 		  AND p.category_id IS NOT NULL
@@ -396,7 +393,6 @@ func GetShopCounts(c *gin.Context) {
 		JOIN brands b ON b.id = p.brand_id
 		  AND b.deleted_at         IS NULL
 		  AND b.verification_status = 'verified'
-		  AND b.subscription_status IN ('active', 'trial')
 		WHERE p.status     = 'active'
 		  AND p.deleted_at IS NULL
 		GROUP BY p.brand_id
@@ -450,7 +446,6 @@ func ListBrands(c *gin.Context) {
 			AND p.deleted_at IS NULL
 		WHERE b.deleted_at          IS NULL
 		  AND b.verification_status  = 'verified'
-		  AND b.subscription_status IN ('active', 'trial')
 		GROUP BY b.id, b.display_id, b.brand_name, b.slug, b.logo_url, b.category,
 			b.verification_status, b.is_exclusive, b.featured_rank
 		ORDER BY
