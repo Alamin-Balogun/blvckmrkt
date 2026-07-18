@@ -153,6 +153,7 @@ export default function ProductDetail() {
   // ── Handlers ──────────────────────────────────────────────────────────────
   const handleAddToCart = async () => {
     if (!selectedSize && (product.sizes?.length ?? 0) > 0) return;
+    if (buyDisabled) return;
     if (!getToken()) {
       navigate("/login");
       return;
@@ -166,6 +167,7 @@ export default function ProductDetail() {
 
 const handleBuyNow = () => {
   if (!selectedSize && (product.sizes?.length ?? 0) > 0) return;
+  if (buyDisabled) return;
   // No login required — Buy Now supports guest checkout (bank transfer only,
   // see checkoutform.jsx). The cart itself still requires an account.
   // Navigate to checkout with just this product — Buy Now is single-item only.
@@ -218,6 +220,18 @@ const handleBuyNow = () => {
   const sizes = product?.sizes ?? [];
   const hasSizes = sizes.length > 0;
   const needsSize = hasSizes && !selectedSize;
+
+  // Out of stock: either the brand marked the whole product sold_out, or
+  // every size row is at 0 stock. Products with no size rows at all aren't
+  // stock-tracked, so they're never gated here.
+  const selectedSizeStock = selectedSizeId != null
+    ? sizes.find((s) => (typeof s === "object" ? s.id : null) === selectedSizeId)?.stock
+    : null;
+  const productSoldOut =
+    product?.status === "sold_out" ||
+    (hasSizes && sizes.every((s) => Number((typeof s === "object" ? s.stock : 0) ?? 0) <= 0));
+  const selectedSizeSoldOut = selectedSizeId != null && Number(selectedSizeStock ?? 0) <= 0;
+  const buyDisabled = productSoldOut || selectedSizeSoldOut;
 
   const isOnSale = product?.compare_price && Number(product.compare_price) > Number(product.price);
   const discount = isOnSale
@@ -689,11 +703,16 @@ const handleBuyNow = () => {
                     const sizeLabel =
                       typeof s === "object" ? (s.size ?? s.name ?? String(s)) : String(s);
                     const sizeId = typeof s === "object" ? (s.id ?? null) : null;
+                    const sizeGone = typeof s === "object" && Number(s.stock ?? 0) <= 0;
                     return (
                       <button
                         key={sizeId ?? sizeLabel}
+                        disabled={sizeGone}
                         className={`pd-size-btn ${selectedSize === sizeLabel ? "active" : ""}`}
+                        style={sizeGone ? {opacity: 0.35, textDecoration: "line-through", cursor: "not-allowed"} : undefined}
+                        title={sizeGone ? "Out of stock" : undefined}
                         onClick={() => {
+                          if (sizeGone) return;
                           setSize(sizeLabel);
                           setSelectedSizeId(sizeId);
                         }}>
@@ -725,8 +744,10 @@ const handleBuyNow = () => {
               <button
                 className={`pd-add-btn ${addedToCart ? "success" : isInCart ? "in-cart" : ""}`}
                 onClick={handleAddToCart}
-                disabled={needsSize || loadingCart}>
-                {addedToCart ? (
+                disabled={needsSize || loadingCart || buyDisabled}>
+                {buyDisabled ? (
+                  "Out of Stock"
+                ) : addedToCart ? (
                   <>
                     <svg
                       width="14"
@@ -795,17 +816,23 @@ const handleBuyNow = () => {
             <button
               className="pd-buy-btn"
               onClick={handleBuyNow}
-              disabled={needsSize || loadingCart}>
-              <svg
-                width="14"
-                height="14"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.2"
-                viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-              Buy Now
+              disabled={needsSize || loadingCart || buyDisabled}>
+              {buyDisabled ? (
+                "Out of Stock"
+              ) : (
+                <>
+                  <svg
+                    width="14"
+                    height="14"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.2"
+                    viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  Buy Now
+                </>
+              )}
             </button>
 
             <div className="pd-divider" />

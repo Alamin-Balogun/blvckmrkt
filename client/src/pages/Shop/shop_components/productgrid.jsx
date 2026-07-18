@@ -41,6 +41,16 @@ function fmt(n) {
   return "₦" + Number(n).toLocaleString("en-NG");
 }
 
+// A product is out of stock once every size's stock is 0 — but only when
+// sizes/stock are actually tracked for it (some products have no size rows
+// at all, and those aren't stock-gated).
+function isOutOfStock(p) {
+  if (p.status === "sold_out") return true;
+  const sizes = p.sizes ?? [];
+  if (sizes.length === 0) return false;
+  return sizes.every((s) => Number(s.stock ?? 0) <= 0);
+}
+
 export default function ProductGrid() {
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -263,6 +273,7 @@ export default function ProductGrid() {
   const addToCart = (product, e) => {
     e.preventDefault();
     e.stopPropagation();
+    if (isOutOfStock(product)) return;
     if (!getToken()) {
       navigate("/login");
       return;
@@ -868,6 +879,7 @@ export default function ProductGrid() {
                     const {tags, saving, isOnSale, isNew} = getProductMeta(p);
                     const primaryImg = p.primary_image || p.images?.[0]?.url || "";
                     const sizes = p.sizes?.map((s) => s.size ?? s.name ?? s) ?? [];
+                    const outOfStock = isOutOfStock(p);
                     return (
                       <motion.div
                         key={p.id}
@@ -877,7 +889,11 @@ export default function ProductGrid() {
                         className="pg-card">
                         <div className="pg-card-img">
                           {primaryImg ? (
-                            <img src={primaryImg} alt={p.name} />
+                            <img
+                              src={primaryImg}
+                              alt={p.name}
+                              style={outOfStock ? {filter: "grayscale(70%)", opacity: 0.55} : undefined}
+                            />
                           ) : (
                             <div
                               style={{
@@ -900,8 +916,25 @@ export default function ProductGrid() {
                             </div>
                           )}
                           <div className="pg-overlay" />
-                          {(tags || isOnSale || isNew) && (
+                          {(outOfStock || tags || isOnSale || isNew) && (
                             <div className="pg-badge-area">
+                              {outOfStock && (
+                                <span
+                                  style={{
+                                    background: "rgba(0,0,0,0.8)",
+                                    border: "1px solid rgba(255,255,255,0.25)",
+                                    color: "#fff",
+                                    fontSize: 8,
+                                    fontWeight: 900,
+                                    letterSpacing: "0.18em",
+                                    textTransform: "uppercase",
+                                    padding: "4px 9px",
+                                    borderRadius: 999,
+                                    width: "fit-content",
+                                  }}>
+                                  Sold Out
+                                </span>
+                              )}
                               {/* All DB tags in ONE pill: "smartphone, samsung, android" */}
                               {tags && (
                                 <span className="pg-tag-pill">
@@ -921,9 +954,10 @@ export default function ProductGrid() {
                           )}
                           <div className="pg-icons">
                             <button
-                              title={cart.includes(p.id) ? "Remove from cart" : "Add to cart"}
+                              title={outOfStock ? "Sold out" : cart.includes(p.id) ? "Remove from cart" : "Add to cart"}
                               className={`pg-icon-btn ${addedId === p.id ? "cart-added" : cart.includes(p.id) ? "cart" : ""}`}
-                              disabled={loadingCartId === p.id}
+                              disabled={loadingCartId === p.id || outOfStock}
+                              style={outOfStock ? {opacity: 0.35, cursor: "not-allowed"} : undefined}
                               onClick={(e) => addToCart(p, e)}>
                               {addedId === p.id ? (
                                 /* flash tick — just added */
@@ -993,10 +1027,12 @@ export default function ProductGrid() {
                           </div>
                           <button
                             className="pg-quick-add"
-                            disabled={loadingCartId === p.id}
+                            disabled={loadingCartId === p.id || outOfStock}
+                            style={outOfStock ? {opacity: 0.4, cursor: "not-allowed"} : undefined}
                             onClick={async (e) => {
                               e.preventDefault();
                               e.stopPropagation();
+                              if (outOfStock) return;
                               if (!getToken()) {
                                 navigate("/login");
                                 return;
@@ -1193,28 +1229,34 @@ export default function ProductGrid() {
               {(sizeModal.sizes ?? []).map((s) => {
                 const sizeId = s.id ?? null;
                 const sizeLabel = s.size ?? s.name ?? s;
+                const sizeOutOfStock = typeof s === "object" && Number(s.stock ?? 0) <= 0;
                 return (
                   <button
                     key={sizeId ?? sizeLabel}
-                    onClick={() => doAddToCart(sizeModal.id, sizeId)}
+                    disabled={sizeOutOfStock}
+                    onClick={() => { if (!sizeOutOfStock) doAddToCart(sizeModal.id, sizeId); }}
                     style={{
                       padding: "8px 16px",
                       border: "1px solid rgba(255,255,255,0.18)",
                       background: "none",
-                      color: "#fff",
+                      color: sizeOutOfStock ? "rgba(255,255,255,0.25)" : "#fff",
                       fontSize: 11,
                       fontWeight: 700,
                       letterSpacing: "0.12em",
                       textTransform: "uppercase",
-                      cursor: "pointer",
+                      cursor: sizeOutOfStock ? "not-allowed" : "pointer",
                       borderRadius: 4,
                       transition: "all 0.15s",
+                      opacity: sizeOutOfStock ? 0.45 : 1,
+                      textDecoration: sizeOutOfStock ? "line-through" : "none",
                     }}
                     onMouseEnter={(e) => {
+                      if (sizeOutOfStock) return;
                       e.currentTarget.style.background = "#ef4444";
                       e.currentTarget.style.borderColor = "#ef4444";
                     }}
                     onMouseLeave={(e) => {
+                      if (sizeOutOfStock) return;
                       e.currentTarget.style.background = "none";
                       e.currentTarget.style.borderColor = "rgba(255,255,255,0.18)";
                     }}>
