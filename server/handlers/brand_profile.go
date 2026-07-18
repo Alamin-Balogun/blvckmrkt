@@ -49,6 +49,12 @@ func UpdateBrandProfile(c *gin.Context) {
 		Description string `json:"description"`
 		LogoURL     string `json:"logo_url"`
 		BannerURL   string `json:"banner_url"`
+		HeroLeftImageURL   string `json:"hero_left_image_url"`
+		HeroCenterImageURL string `json:"hero_center_image_url"`
+		HeroRightImageURL  string `json:"hero_right_image_url"`
+		StoryLine1         string `json:"story_line_1"`
+		StoryLine2         string `json:"story_line_2"`
+		StoryLine3         string `json:"story_line_3"`
 		Website     string `json:"website"`
 		Category    string `json:"category"`
 		Instagram   string `json:"instagram"`
@@ -110,10 +116,16 @@ func UpdateBrandProfile(c *gin.Context) {
 
 // ── Update brands table ───────────────────────────────────────────────────
 log.Printf("[UpdateBrandProfile] updating brand for user %d", userID)
-if err := database.DB.Exec(`UPDATE brands SET brand_name = ?, logo_url = ?, banner_url = ?, description = ?, website = ?, category = ?, instagram = ?, facebook = ?, twitter = ?, tik_tok = ?, phone = ?, updated_at = NOW() WHERE user_id = ? AND deleted_at IS NULL`,
+if err := database.DB.Exec(`UPDATE brands SET brand_name = ?, logo_url = ?, banner_url = ?, hero_left_image_url = ?, hero_center_image_url = ?, hero_right_image_url = ?, story_line_1 = ?, story_line_2 = ?, story_line_3 = ?, description = ?, website = ?, category = ?, instagram = ?, facebook = ?, twitter = ?, tik_tok = ?, phone = ?, updated_at = NOW() WHERE user_id = ? AND deleted_at IS NULL`,
     strings.TrimSpace(req.BrandName),
     req.LogoURL,
     req.BannerURL,
+    req.HeroLeftImageURL,
+    req.HeroCenterImageURL,
+    req.HeroRightImageURL,
+    strings.TrimSpace(req.StoryLine1),
+    strings.TrimSpace(req.StoryLine2),
+    strings.TrimSpace(req.StoryLine3),
     strings.TrimSpace(req.Description),
     strings.TrimSpace(req.Website),
     strings.TrimSpace(req.Category),
@@ -153,6 +165,12 @@ type BrandProfileResponse struct {
 	Description        string                    `json:"description"`
 	LogoURL            string                    `json:"logo_url"`
 	BannerURL          string                    `json:"banner_url"`
+	HeroLeftImageURL   string                    `json:"hero_left_image_url"`
+	HeroCenterImageURL string                    `json:"hero_center_image_url"`
+	HeroRightImageURL  string                    `json:"hero_right_image_url"`
+	StoryLine1         string                    `json:"story_line_1"`
+	StoryLine2         string                    `json:"story_line_2"`
+	StoryLine3         string                    `json:"story_line_3"`
 	Website            string                    `json:"website"`
 	Category           string                    `json:"category"`
 	Instagram          string                    `json:"instagram"`
@@ -202,6 +220,12 @@ func buildBrandProfileResponse(user models.User, brand models.Brand) BrandProfil
 		Description:         brand.Description,
 		LogoURL:             brand.LogoURL,
 		BannerURL:           brand.BannerURL,
+		HeroLeftImageURL:    brand.HeroLeftImageURL,
+		HeroCenterImageURL:  brand.HeroCenterImageURL,
+		HeroRightImageURL:   brand.HeroRightImageURL,
+		StoryLine1:          brand.StoryLine1,
+		StoryLine2:          brand.StoryLine2,
+		StoryLine3:          brand.StoryLine3,
 		Website:             brand.Website,
 		Category:            brand.Category,
 		Instagram:           brand.Instagram,

@@ -95,6 +95,15 @@ type PublicBrandProfile struct {
 	Twitter   string `json:"twitter"`
 	TikTok    string `json:"tiktok"`
 	Phone     string `json:"phone"`
+
+	// Optional animated hero showcase — empty strings when the brand hasn't
+	// opted in, so the frontend falls back to the plain static banner.
+	HeroLeftImageURL   string `json:"hero_left_image_url"`
+	HeroCenterImageURL string `json:"hero_center_image_url"`
+	HeroRightImageURL  string `json:"hero_right_image_url"`
+	StoryLine1         string `json:"story_line_1"`
+	StoryLine2         string `json:"story_line_2"`
+	StoryLine3         string `json:"story_line_3"`
 }
 
 // GET /api/brands/:slug
@@ -123,7 +132,13 @@ func GetPublicBrandBySlug(c *gin.Context) {
 			COALESCE(b.facebook, '')  AS facebook,
 			COALESCE(b.twitter, '')   AS twitter,
 			COALESCE(b.tik_tok, '')   AS tiktok,
-			COALESCE(b.phone, '')     AS phone
+			COALESCE(b.phone, '')     AS phone,
+			COALESCE(b.hero_left_image_url, '')   AS hero_left_image_url,
+			COALESCE(b.hero_center_image_url, '') AS hero_center_image_url,
+			COALESCE(b.hero_right_image_url, '')  AS hero_right_image_url,
+			COALESCE(b.story_line_1, '') AS story_line_1,
+			COALESCE(b.story_line_2, '') AS story_line_2,
+			COALESCE(b.story_line_3, '') AS story_line_3
 		FROM brands b
 		LEFT JOIN users u    ON u.id = b.user_id
 		LEFT JOIN products p ON p.brand_id = b.id
@@ -135,7 +150,9 @@ func GetPublicBrandBySlug(c *gin.Context) {
 			b.logo_url, b.banner_url, b.website, b.category,
 			b.verification_status, b.subscription_plan, b.subscription_status,
 			u.city, u.state_name, u.country_name,
-			b.instagram, b.facebook, b.twitter, b.tik_tok, b.phone
+			b.instagram, b.facebook, b.twitter, b.tik_tok, b.phone,
+			b.hero_left_image_url, b.hero_center_image_url, b.hero_right_image_url,
+			b.story_line_1, b.story_line_2, b.story_line_3
 	`, slug).Scan(&brand).Error
 
 	if err != nil || brand.ID == 0 {

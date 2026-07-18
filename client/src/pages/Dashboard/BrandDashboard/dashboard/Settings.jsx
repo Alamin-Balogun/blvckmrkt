@@ -116,6 +116,12 @@ export default function Settings({onBrandUpdate}) {
     description:  "",
     logo_url:     "",
     banner_url:   "",
+    hero_left_image_url:   "",
+    hero_center_image_url: "",
+    hero_right_image_url:  "",
+    story_line_1: "",
+    story_line_2: "",
+    story_line_3: "",
     website:      "",
     instagram:    "",
     facebook:     "",
@@ -146,6 +152,12 @@ export default function Settings({onBrandUpdate}) {
           description:  p.description  || "",
           logo_url:     p.logo_url     || "",
           banner_url:   p.banner_url   || "",
+          hero_left_image_url:   p.hero_left_image_url   || "",
+          hero_center_image_url: p.hero_center_image_url || "",
+          hero_right_image_url:  p.hero_right_image_url  || "",
+          story_line_1: p.story_line_1 || "",
+          story_line_2: p.story_line_2 || "",
+          story_line_3: p.story_line_3 || "",
           website:      p.website      || "",
           instagram:    p.instagram    || "",
           facebook:     p.facebook     || "",
@@ -192,6 +204,12 @@ export default function Settings({onBrandUpdate}) {
         description:  form.description,
         logo_url:     form.logo_url,
         banner_url:   form.banner_url,
+        hero_left_image_url:   form.hero_left_image_url,
+        hero_center_image_url: form.hero_center_image_url,
+        hero_right_image_url:  form.hero_right_image_url,
+        story_line_1: form.story_line_1,
+        story_line_2: form.story_line_2,
+        story_line_3: form.story_line_3,
         website:      form.website,
         phone:        form.phone,
         // Location
@@ -221,6 +239,12 @@ export default function Settings({onBrandUpdate}) {
           description:  updated.description   ?? prev.description,
           logo_url:     updated.logo_url       ?? prev.logo_url,
           banner_url:   updated.banner_url     ?? prev.banner_url,
+          hero_left_image_url:   updated.hero_left_image_url   ?? prev.hero_left_image_url,
+          hero_center_image_url: updated.hero_center_image_url ?? prev.hero_center_image_url,
+          hero_right_image_url:  updated.hero_right_image_url  ?? prev.hero_right_image_url,
+          story_line_1: updated.story_line_1 ?? prev.story_line_1,
+          story_line_2: updated.story_line_2 ?? prev.story_line_2,
+          story_line_3: updated.story_line_3 ?? prev.story_line_3,
           website:      updated.website        ?? prev.website,
           instagram:    updated.instagram      ?? prev.instagram,
           facebook:     updated.facebook       ?? prev.facebook,
@@ -452,6 +476,51 @@ export default function Settings({onBrandUpdate}) {
                   Wide banner for your storefront header. Recommended: 1200×400px.
                 </p>
               </div>
+            </div>
+
+            {/* Hero Showcase */}
+            <div style={{marginBottom: 14}}>
+              <Label c="Hero Showcase" />
+              <p style={{color: "rgba(255,255,255,0.25)", fontSize: 11, lineHeight: 1.6, margin: "0 0 12px"}}>
+                Upload up to 3 product photos for an animated showcase on your storefront, replacing the plain banner above.
+                The center image is required for the showcase to appear — left/right are optional.
+              </p>
+              <div className="bs-2col" style={{gap: 12, marginBottom: 12}}>
+                {[
+                  {key: "hero_left_image_url", label: "Left Image"},
+                  {key: "hero_center_image_url", label: "Center Image (required)"},
+                  {key: "hero_right_image_url", label: "Right Image"},
+                ].map(({key, label}) => (
+                  <div key={key}>
+                    <div style={{marginBottom: 8, borderRadius: 10, overflow: "hidden", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", height: 70, position: "relative", display: "flex", alignItems: "center", justifyContent: "center"}}>
+                      {form[key] ? (
+                        <img src={form[key]} alt={label} style={{width: "100%", height: "100%", objectFit: "cover"}} />
+                      ) : (
+                        <p style={{color: "rgba(255,255,255,0.2)", fontSize: 10, margin: 0, textAlign: "center", padding: "0 8px"}}>
+                          {label}
+                        </p>
+                      )}
+                    </div>
+                    <ImageUpload
+                      folder="brand-hero"
+                      shape="square"
+                      label="Upload"
+                      preview={form[key]}
+                      onUpload={(url) => setForm((f) => ({...f, [key]: url}))}
+                    />
+                  </div>
+                ))}
+              </div>
+              {[
+                {key: "story_line_1", placeholder: "Crafted for the streets."},
+                {key: "story_line_2", placeholder: "Made to move with you."},
+                {key: "story_line_3", placeholder: "Wear it your way."},
+              ].map(({key, placeholder}, i) => (
+                <div key={key} style={{marginBottom: 8}}>
+                  <Label c={`Story Line ${i + 1} (optional)`} />
+                  <input value={form[key]} onChange={set(key)} placeholder={placeholder} style={inp} onFocus={onF} onBlur={onB} />
+                </div>
+              ))}
             </div>
 
             <div style={{marginBottom: 10}}>

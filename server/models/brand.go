@@ -26,6 +26,12 @@ type Brand struct {
 	Description        string             `gorm:"type:text"                                                       json:"description,omitempty"`
 	LogoURL            string             `gorm:"type:varchar(512)"                                               json:"logo_url,omitempty"`
 	BannerURL          string             `gorm:"type:varchar(512)"                                               json:"banner_url,omitempty"`
+	HeroLeftImageURL   string             `gorm:"type:varchar(512)"                                               json:"hero_left_image_url,omitempty"`
+	HeroCenterImageURL string             `gorm:"type:varchar(512)"                                               json:"hero_center_image_url,omitempty"`
+	HeroRightImageURL  string             `gorm:"type:varchar(512)"                                               json:"hero_right_image_url,omitempty"`
+	StoryLine1         string             `gorm:"type:varchar(160)"                                               json:"story_line_1,omitempty"`
+	StoryLine2         string             `gorm:"type:varchar(160)"                                               json:"story_line_2,omitempty"`
+	StoryLine3         string             `gorm:"type:varchar(160)"                                               json:"story_line_3,omitempty"`
 	Website            string             `gorm:"type:varchar(255)"                                               json:"website,omitempty"`
 	Category           string             `gorm:"type:varchar(100)"                                               json:"category,omitempty"`
 	Instagram          string             `gorm:"type:varchar(100)"                                               json:"instagram,omitempty"`
@@ -87,6 +93,12 @@ type BrandResponse struct {
 	Description         string             `json:"description,omitempty"`
 	LogoURL             string             `json:"logo_url,omitempty"`
 	BannerURL           string             `json:"banner_url,omitempty"`
+	HeroLeftImageURL    string             `json:"hero_left_image_url,omitempty"`
+	HeroCenterImageURL  string             `json:"hero_center_image_url,omitempty"`
+	HeroRightImageURL   string             `json:"hero_right_image_url,omitempty"`
+	StoryLine1          string             `json:"story_line_1,omitempty"`
+	StoryLine2          string             `json:"story_line_2,omitempty"`
+	StoryLine3          string             `json:"story_line_3,omitempty"`
 	Website             string             `json:"website,omitempty"`
 	Category            string             `json:"category,omitempty"`
 	Instagram           string             `json:"instagram,omitempty"`
@@ -118,6 +130,12 @@ func (b *Brand) ToResponse() BrandResponse {
 		Description:         b.Description,
 		LogoURL:             b.LogoURL,
 		BannerURL:           b.BannerURL,
+		HeroLeftImageURL:    b.HeroLeftImageURL,
+		HeroCenterImageURL:  b.HeroCenterImageURL,
+		HeroRightImageURL:   b.HeroRightImageURL,
+		StoryLine1:          b.StoryLine1,
+		StoryLine2:          b.StoryLine2,
+		StoryLine3:          b.StoryLine3,
 		Website:             b.Website,
 		Category:            b.Category,
 		Instagram:           b.Instagram,
