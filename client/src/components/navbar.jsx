@@ -117,7 +117,7 @@ export default function Navbar() {
     <>
       {/* ── Marquee Top Bar ──────────────────────────────────────────────────── */}
       {showBar && (
-        <div className="bg-white text-black overflow-hidden py-1.5">
+        <div className="bg-white text-black overflow-hidden h-9 flex items-center">
           <div className="flex whitespace-nowrap animate-marquee">
             {[...marqueeItems, ...marqueeItems].map((item, i) => (
               <span key={i} className="mx-8 text-[11px] font-bold tracking-[0.2em] uppercase">
