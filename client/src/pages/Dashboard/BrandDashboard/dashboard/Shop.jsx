@@ -20,11 +20,15 @@ const API_BASE = import.meta.env.VITE_API_URL ?? "https://blvckmrktng.com";
 
 const STEPS = ["Contact", "Delivery", "Payment", "Review"];
 
-// ✅ UPDATED: Payment methods with Flutterwave
+// Card/Paystack is disabled to match the main site checkout — see
+// CARD_PAYMENTS_ENABLED in checkout_components/checkoutform.jsx. Flip both
+// back on together once the Paystack dashboard issue is resolved.
+const CARD_PAYMENTS_ENABLED = false;
+
 const PAYMENT_METHODS = [
-  {id: "card", label: "Credit / Debit Card", icon: "💳", description: "Powered by Paystack"},
   {id: "flutterwave", label: "Flutterwave", icon: "🦋", description: "Mobile Money, Bank & More"},
   {id: "transfer", label: "Bank Transfer", icon: "🏦", description: "Manual Transfer"},
+  {id: "card", label: "Credit / Debit Card", icon: "💳", description: "Powered by Paystack", comingSoon: true},
 ];
 
 const STATUS_COLORS = {
@@ -395,7 +399,7 @@ const {fmtMoney, userCurrency, baseCurrency} = usePlatformSettings();
     country_name: "Nigeria", // ✅ NEW
   });
   const [payment, setPayment] = useState({
-    method: "card",
+    method: "flutterwave",
     cardNumber: "",
     expiry: "",
     cvv: "",
@@ -807,12 +811,16 @@ const extractLocationFromMethod = useCallback((method) => {
     console.log("🚀 Place order initiated with method:", payment.method);
     console.log("💰 Order total:", orderTotal, userCurrency);
 
-    // PAYSTACK
+    // PAYSTACK — coming soon, see CARD_PAYMENTS_ENABLED
     if (payment.method === "card") {
+      if (!CARD_PAYMENTS_ENABLED) {
+        setOrderError("Card payments are coming soon. Please use Flutterwave or Bank Transfer for now.");
+        return;
+      }
       setPlacing(true);
       setOrderError("");
       setPaymentStuck(false);
-      
+
       console.log("💳 Initializing Paystack payment...");
       
       try {
@@ -2094,40 +2102,55 @@ const extractLocationFromMethod = useCallback((method) => {
                     Payment Method
                   </p>
                   <div style={{display: "flex", gap: 10, marginBottom: 18}}>
-                    {PAYMENT_METHODS.map((m) => (
-                      <div
-                        key={m.id}
-                        onClick={() => setPayment({...payment, method: m.id})}
-                        style={{
-                          flex: 1,
-                          padding: "12px 8px",
-                          borderRadius: 10,
-                          cursor: "pointer",
-                          border: `1px solid ${payment.method === m.id ? "#ef4444" : "rgba(255,255,255,0.1)"}`,
-                          background:
-                            payment.method === m.id
-                              ? "rgba(239,68,68,0.07)"
-                              : "rgba(255,255,255,0.02)",
-                          display: "flex",
-                          flexDirection: "column",
-                          alignItems: "center",
-                          gap: 5,
-                          transition: "all 0.2s",
-                        }}>
-                        <span style={{fontSize: 18}}>{m.icon}</span>
-                        <span
+                    {PAYMENT_METHODS.map((m) => {
+                      const disabled = m.comingSoon && !CARD_PAYMENTS_ENABLED;
+                      return (
+                        <div
+                          key={m.id}
+                          onClick={() => { if (!disabled) setPayment({...payment, method: m.id}); }}
                           style={{
-                            fontSize: 8,
-                            fontWeight: 700,
-                            letterSpacing: "0.1em",
-                            textTransform: "uppercase",
-                            textAlign: "center",
-                            color: payment.method === m.id ? "#fff" : "rgba(255,255,255,0.4)",
+                            flex: 1,
+                            position: "relative",
+                            padding: "12px 8px",
+                            borderRadius: 10,
+                            cursor: disabled ? "not-allowed" : "pointer",
+                            opacity: disabled ? 0.45 : 1,
+                            border: `1px solid ${payment.method === m.id ? "#ef4444" : "rgba(255,255,255,0.1)"}`,
+                            background:
+                              payment.method === m.id
+                                ? "rgba(239,68,68,0.07)"
+                                : "rgba(255,255,255,0.02)",
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "center",
+                            gap: 5,
+                            transition: "all 0.2s",
                           }}>
-                          {m.label}
-                        </span>
-                      </div>
-                    ))}
+                          {disabled && (
+                            <span style={{
+                              position: "absolute", top: -7, right: -4,
+                              background: "#eab308", color: "#000", fontSize: 6,
+                              fontWeight: 900, letterSpacing: "0.06em", textTransform: "uppercase",
+                              padding: "2px 5px", borderRadius: 999,
+                            }}>
+                              Coming Soon
+                            </span>
+                          )}
+                          <span style={{fontSize: 18}}>{m.icon}</span>
+                          <span
+                            style={{
+                              fontSize: 8,
+                              fontWeight: 700,
+                              letterSpacing: "0.1em",
+                              textTransform: "uppercase",
+                              textAlign: "center",
+                              color: payment.method === m.id ? "#fff" : "rgba(255,255,255,0.4)",
+                            }}>
+                            {m.label}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
 
                   {/* Card preview - shown but not used (Paystack handles real payment) */}
@@ -2336,9 +2359,9 @@ const extractLocationFromMethod = useCallback((method) => {
                           Transfer To This Account
                         </p>
                         {[
-                          {label: "Bank Name", value: "First Bank of Nigeria"},
-                          {label: "Account Name", value: "BLVCKMRKT Limited"},
-                          {label: "Account Number", value: "3012 4567 89"},
+                          {label: "Bank Name", value: "Fidelity Bank Plc"},
+                          {label: "Account Name", value: "OLATOMIWA AYOMIDE SHITTU"},
+                          {label: "Account Number", value: "6174 0498 08"},
                           {label: "Amount", value: fmtMoney(orderTotal)},
                           {label: "Reference", value: `ORDER-${Date.now().toString().slice(-6)}`},
                         ].map((r) => (
