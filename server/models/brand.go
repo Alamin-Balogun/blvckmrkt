@@ -29,9 +29,9 @@ type Brand struct {
 	HeroLeftImageURL   string             `gorm:"type:varchar(512)"                                               json:"hero_left_image_url,omitempty"`
 	HeroCenterImageURL string             `gorm:"type:varchar(512)"                                               json:"hero_center_image_url,omitempty"`
 	HeroRightImageURL  string             `gorm:"type:varchar(512)"                                               json:"hero_right_image_url,omitempty"`
-	StoryLine1         string             `gorm:"type:varchar(160)"                                               json:"story_line_1,omitempty"`
-	StoryLine2         string             `gorm:"type:varchar(160)"                                               json:"story_line_2,omitempty"`
-	StoryLine3         string             `gorm:"type:varchar(160)"                                               json:"story_line_3,omitempty"`
+	StoryLine1         string             `gorm:"column:story_line_1;type:varchar(160)"                           json:"story_line_1,omitempty"`
+	StoryLine2         string             `gorm:"column:story_line_2;type:varchar(160)"                           json:"story_line_2,omitempty"`
+	StoryLine3         string             `gorm:"column:story_line_3;type:varchar(160)"                           json:"story_line_3,omitempty"`
 	Website            string             `gorm:"type:varchar(255)"                                               json:"website,omitempty"`
 	Category           string             `gorm:"type:varchar(100)"                                               json:"category,omitempty"`
 	Instagram          string             `gorm:"type:varchar(100)"                                               json:"instagram,omitempty"`
