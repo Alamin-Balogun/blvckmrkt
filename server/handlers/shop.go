@@ -236,9 +236,10 @@ func GetProduct(c *gin.Context) {
 	sizeList := make([]gin.H, 0, len(product.Sizes))
 	for _, s := range product.Sizes {
 		sizeList = append(sizeList, gin.H{
-			"id":   s.ID,
-			"size": s.Size,
-			"name": s.Size,
+			"id":    s.ID,
+			"size":  s.Size,
+			"name":  s.Size,
+			"stock": s.Stock,
 		})
 	}
 
