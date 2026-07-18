@@ -513,7 +513,7 @@ const back = () => {
         if (receipt) {
           const formData = new FormData();
           formData.append("receipt", receipt);
-          const uploadRes = await fetch(`${API_BASE}/api/buyer/upload/receipt`, {
+          const uploadRes = await fetch(`${API_BASE}/api/upload/receipt`, {
             method: "POST",
             headers: token ? {Authorization: `Bearer ${token}`} : {},
             body: formData,

@@ -26,6 +26,11 @@ func Register(r *gin.Engine) {
 	// ── Image upload (any logged-in account) ───────────────────────────────────
 	api.POST("/upload", middleware.Auth(), handlers.UploadImage)
 
+	// ── Transfer receipt upload (any logged-in account) ─────────────────────────
+	// Handler already existed but was never wired to a route — bank-transfer
+	// checkout in both dashboards has been silently failing to attach receipts.
+	api.POST("/upload/receipt", middleware.Auth(), handlers.UploadReceipt)
+
 	// ── Auth (public) ──────────────────────────────────────────────────────────
 	auth := api.Group("/auth")
 	{
