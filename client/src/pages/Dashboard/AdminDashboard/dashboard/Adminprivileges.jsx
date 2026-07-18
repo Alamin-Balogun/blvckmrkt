@@ -11,7 +11,7 @@ import {
   getUserPrivileges,
   saveUserPrivileges,
   getUsers,
-} from "./api";
+} from "./dashboard_components/api";
 
 const searchUsers = (q) => getUsers({search: q, limit: 10});
 
