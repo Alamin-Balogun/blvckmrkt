@@ -23,6 +23,64 @@ const paymentMethods = [
   {id: "card", label: "Credit / Debit Card", icon: "💳", description: "Powered by Paystack", comingSoon: true},
 ];
 
+const gatewayLabel = (g) =>
+  ({flutterwave: "Flutterwave", paystack: "Paystack / Card", transfer: "Bank Transfer"}[g] || g || "—");
+
+// ─── Copyable reference row — order/payment confirmation screens use several
+// of these so the customer can grab exactly what they'd need to quote to
+// support if anything goes wrong later. ───────────────────────────────────────
+function CopyRow({label, value, highlight}) {
+  const [copied, setCopied] = useState(false);
+  if (!value) return null;
+  const copy = () => {
+    navigator.clipboard?.writeText(String(value)).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  };
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 12,
+        padding: "10px 0",
+        borderBottom: "1px solid rgba(255,255,255,0.06)",
+      }}>
+      <span style={{color: "rgba(255,255,255,0.35)", fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase"}}>
+        {label}
+      </span>
+      <button
+        type="button"
+        onClick={copy}
+        title="Copy"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          padding: 0,
+          fontFamily: "'Bebas Neue', sans-serif",
+          fontSize: highlight ? "1.05rem" : "0.95rem",
+          color: highlight ? "#ef4444" : "#fff",
+          letterSpacing: "0.06em",
+        }}>
+        {value}
+        <svg width="12" height="12" fill="none" stroke={copied ? "#22c55e" : "rgba(255,255,255,0.3)"} strokeWidth="2" viewBox="0 0 24 24">
+          {copied ? (
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          ) : (
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+          )}
+        </svg>
+      </button>
+    </div>
+  );
+}
+
 // ─── Portal dropdown ──────────────────────────────────────────────────────────
 function SearchSelect({options, value, onChange, placeholder, disabled}) {
   const [open, setOpen] = useState(false);
@@ -667,6 +725,10 @@ export default function CheckoutForm() {
   const [step, setStep] = useState(0);
   const [complete, setComplete] = useState(false);
   const [orderRef, setOrderRef] = useState("");
+  // Populated once we know how the order was actually paid for, so the
+  // confirmation screen can show something the customer can copy and save —
+  // not just the order reference.
+  const [paymentDetails, setPaymentDetails] = useState(null); // {gateway, reference, amount, currency}
 
   const [contact, setContact] = useState({email: "", phone: "", subscribe: false});
   const [delivery, setDelivery] = useState({
@@ -772,6 +834,12 @@ useEffect(() => {
         const status = json?.data?.status;
         if (status === "completed") {
           setOrderRef(json.data.order_ref || pendingTxRef);
+          setPaymentDetails({
+            gateway: json.data.gateway || "flutterwave",
+            reference: json.data.tx_ref || pendingTxRef,
+            amount: json.data.amount,
+            currency: json.data.currency,
+          });
           setComplete(true);
           setPlacing(false);
           setPendingTxRef(null);
@@ -1357,6 +1425,12 @@ if (receipt) {
         }
 
         setOrderRef(ref);
+        setPaymentDetails({
+          gateway: "transfer",
+          reference: ref,
+          amount: orderTotal,
+          currency: userCurrency,
+        });
         setComplete(true);
         console.log("✅ Transfer order created successfully!");
         
@@ -1586,31 +1660,37 @@ if (!delivery.country_code && geoLoaded) {
                 background: "#0d0d0d",
                 border: "1px solid rgba(255,255,255,0.08)",
                 borderRadius: 12,
-                padding: "16px 24px",
-                marginBottom: 32,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
+                padding: "6px 20px",
+                marginBottom: 16,
+                textAlign: "left",
               }}>
-              <span
-                style={{
-                  color: "rgba(255,255,255,0.3)",
-                  fontSize: 11,
-                  letterSpacing: "0.1em",
-                  textTransform: "uppercase",
-                }}>
-                Order Reference
-              </span>
-              <span
-                style={{
-                  fontFamily: "'Bebas Neue', sans-serif",
-                  fontSize: "1.2rem",
-                  color: "#ef4444",
-                  letterSpacing: "0.1em",
-                }}>
-                {orderRef}
-              </span>
+              <CopyRow label="Order Reference" value={orderRef} highlight />
+              {paymentDetails && (
+                <>
+                  <CopyRow label="Payment Reference" value={paymentDetails.reference} />
+                  <CopyRow label="Payment Type" value={gatewayLabel(paymentDetails.gateway)} />
+                  {paymentDetails.amount != null && (
+                    <CopyRow
+                      label="Amount Paid"
+                      value={`${paymentDetails.currency || ""} ${Number(paymentDetails.amount).toLocaleString()}`.trim()}
+                    />
+                  )}
+                </>
+              )}
             </div>
+            <p
+              style={{
+                color: "rgba(255,255,255,0.28)",
+                fontSize: 11,
+                lineHeight: 1.6,
+                marginBottom: 32,
+                maxWidth: 420,
+                marginLeft: "auto",
+                marginRight: "auto",
+              }}>
+              Tap any line above to copy it. Save these details somewhere safe (a note, a
+              screenshot) in case you ever need to contact support about this order.
+            </p>
             <div
               style={{
                 display: "flex",

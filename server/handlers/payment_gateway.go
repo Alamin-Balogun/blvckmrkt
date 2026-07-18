@@ -478,6 +478,14 @@ func GetPaymentIntentStatus(c *gin.Context) {
 		"order_id":       intent.OrderID,
 		"order_ref":      intent.OrderRef,
 		"failure_reason": intent.FailureReason,
+		// So the checkout tab's success/error screen can show the customer
+		// something to save/quote even though this endpoint never has the
+		// order itself — just the intent that produced (or failed to
+		// produce) it.
+		"gateway":  intent.Gateway,
+		"tx_ref":   intent.TxRef,
+		"amount":   intent.Amount,
+		"currency": intent.Currency,
 	})
 }
 
