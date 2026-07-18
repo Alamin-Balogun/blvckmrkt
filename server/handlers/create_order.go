@@ -406,7 +406,14 @@ func CreateOrder(c *gin.Context) {
 
 	if txErr != nil {
 		log.Printf("❌ Order build failed: %v", txErr)
-		c.JSON(http.StatusBadRequest, gin.H{"error": txErr.Error()})
+		errMsg := txErr.Error()
+		// paystack/card/flutterwave have already been verified as charged by
+		// this point — see chargedFailureMessage in payment_gateway.go.
+		switch req.Payment.Method {
+		case "paystack", "card", "flutterwave":
+			errMsg = chargedFailureMessage(errMsg, paymentRef)
+		}
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsg})
 		return
 	}
 
@@ -569,18 +576,24 @@ func buildOrder(
 			lineTotal := unitPrice * float64(it.Quantity)
 			computedSubtotal += lineTotal
 
-			// Size & stock
+			// Size & stock — the decrement is a single conditional UPDATE (not a
+			// read-then-write) so two orders racing for the last unit can't both
+			// pass a stale stock check: only one UPDATE ... WHERE stock >= qty
+			// can affect a row, and the loser sees RowsAffected == 0.
 			var productSizeID *uint
 			sizeName := it.Size
 			if sizeName != "" && sizeName != "—" {
 				var ps models.ProductSize
 				if err := tx.Where("product_id = ? AND size = ?", product.ID, sizeName).First(&ps).Error; err == nil {
 					productSizeID = &ps.ID
-					if ps.Stock < it.Quantity {
-						return fmt.Errorf("%s (size %s) only has %d in stock", product.Name, sizeName, ps.Stock)
-					}
-					if err := tx.Model(&ps).Update("stock", gorm.Expr("stock - ?", it.Quantity)).Error; err != nil {
+					res := tx.Model(&models.ProductSize{}).
+						Where("id = ? AND stock >= ?", ps.ID, it.Quantity).
+						Update("stock", gorm.Expr("stock - ?", it.Quantity))
+					if res.Error != nil {
 						return fmt.Errorf("failed to update stock for %s %s", product.Name, sizeName)
+					}
+					if res.RowsAffected == 0 {
+						return fmt.Errorf("%s (size %s) only has %d in stock", product.Name, sizeName, ps.Stock)
 					}
 				}
 			}

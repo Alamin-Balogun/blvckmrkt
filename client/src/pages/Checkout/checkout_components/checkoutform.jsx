@@ -779,11 +779,13 @@ useEffect(() => {
           return;
         }
         if (status === "failed") {
-          setOrderError(
-            "Payment failed" +
-            (json.data.failure_reason ? `: ${json.data.failure_reason}` : "") +
-            ". Please try again."
-          );
+          // The backend's failure_reason is already a complete, correctly
+          // worded message — for a payment that was actually charged before
+          // failing (e.g. stock ran out while the customer was on the
+          // gateway's page), it explicitly says NOT to retry, since retrying
+          // would charge them a second time. Appending our own "Please try
+          // again." here unconditionally used to override that warning.
+          setOrderError(json.data.failure_reason || "Payment failed. Please try again.");
           setPlacing(false);
           setPendingTxRef(null);
           return;

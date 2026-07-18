@@ -261,7 +261,14 @@ func claimIntentOrWait(intent *models.PaymentIntent) (order models.Order, handle
 			return finishedOrder, true, nil
 		}
 		if fresh.Status == models.IntentFailed {
-			return models.Order{}, true, fmt.Errorf("Payment failed%s", condSuffix(fresh.FailureReason))
+			// fresh.FailureReason is already a complete sentence (either a
+			// plain verification failure or a chargedFailureMessage) — don't
+			// prefix it, that would bury a "do NOT pay again" warning under
+			// a generic "Payment failed:" that implies retrying is fine.
+			if fresh.FailureReason != "" {
+				return models.Order{}, true, fmt.Errorf("%s", fresh.FailureReason)
+			}
+			return models.Order{}, true, fmt.Errorf("Payment failed")
 		}
 	}
 	return models.Order{}, true, fmt.Errorf("Payment is still being processed — please check back in a moment")
@@ -291,7 +298,12 @@ func finalizeFlutterwaveIntent(intent *models.PaymentIntent, transactionID strin
 	}
 
 	if verification.Data.TxRef != intent.TxRef {
-		return models.Order{}, fmt.Errorf("Payment reference mismatch")
+		msg := chargedFailureMessage("payment reference mismatch", intent.TxRef)
+		database.DB.Model(intent).Updates(map[string]interface{}{
+			"status":         models.IntentFailed,
+			"failure_reason": msg,
+		})
+		return models.Order{}, fmt.Errorf("%s", msg)
 	}
 	// ✅ Rounded comparison — see the note in create_order.go's Flutterwave
 	// branch for why a naked float `!=` here was rejecting real payments.
@@ -299,17 +311,23 @@ func finalizeFlutterwaveIntent(intent *models.PaymentIntent, transactionID strin
 		!strings.EqualFold(verification.Data.Currency, intent.Currency) {
 		log.Printf("❌ Amount/currency mismatch for tx_ref=%s: expected=%.2f %s got=%.2f %s",
 			intent.TxRef, intent.Amount, intent.Currency, verification.Data.Amount, verification.Data.Currency)
+		msg := chargedFailureMessage("amount/currency mismatch", intent.TxRef)
 		database.DB.Model(intent).Updates(map[string]interface{}{
 			"status":         models.IntentFailed,
-			"failure_reason": "Amount/currency mismatch",
+			"failure_reason": msg,
 		})
-		return models.Order{}, fmt.Errorf("Payment amount mismatch")
+		return models.Order{}, fmt.Errorf("%s", msg)
 	}
 
 	var req createOrderRequest
 	if err := json.Unmarshal([]byte(intent.Payload), &req); err != nil {
 		log.Printf("❌ Failed to unmarshal payment intent payload for tx_ref=%s: %v", intent.TxRef, err)
-		return models.Order{}, fmt.Errorf("Failed to build order")
+		msg := chargedFailureMessage("internal error building your order", intent.TxRef)
+		database.DB.Model(intent).Updates(map[string]interface{}{
+			"status":         models.IntentFailed,
+			"failure_reason": msg,
+		})
+		return models.Order{}, fmt.Errorf("%s", msg)
 	}
 
 	channel := verification.Data.PaymentType
@@ -340,11 +358,12 @@ func finalizeFlutterwaveIntent(intent *models.PaymentIntent, transactionID strin
 	})
 	if txErr != nil {
 		log.Printf("❌ Order build failed for tx_ref=%s: %v", intent.TxRef, txErr)
+		msg := chargedFailureMessage(txErr.Error(), intent.TxRef)
 		database.DB.Model(intent).Updates(map[string]interface{}{
 			"status":         models.IntentFailed,
-			"failure_reason": txErr.Error(),
+			"failure_reason": msg,
 		})
-		return models.Order{}, txErr
+		return models.Order{}, fmt.Errorf("%s", msg)
 	}
 
 	database.DB.Model(intent).Updates(map[string]interface{}{
@@ -399,7 +418,7 @@ func FinalizeFlutterwavePayment(c *gin.Context) {
 		return
 	}
 	if intent.Status == models.IntentFailed {
-		utils.BadRequest(c, "This payment failed"+condSuffix(intent.FailureReason), nil)
+		utils.BadRequest(c, alreadyFailedMessage(intent.FailureReason), nil)
 		return
 	}
 
@@ -462,11 +481,30 @@ func GetPaymentIntentStatus(c *gin.Context) {
 	})
 }
 
-func condSuffix(reason string) string {
+// alreadyFailedMessage is used when a client re-calls finalize on an intent
+// that's already marked Failed (e.g. a retried request). Like the
+// claimIntentOrWait case, FailureReason may already be a complete
+// chargedFailureMessage sentence, so it isn't safe to always prefix it with
+// a generic "This payment failed:".
+func alreadyFailedMessage(reason string) string {
 	if reason == "" {
-		return ""
+		return "This payment failed"
 	}
-	return ": " + reason
+	return reason
+}
+
+// chargedFailureMessage builds the failure message for the case where the
+// gateway has already confirmed and captured the charge (VerifyXPayment
+// returned success) but we couldn't turn it into an order afterwards — e.g.
+// stock ran out in the window while the customer was on the gateway's hosted
+// payment page. Telling the customer to "just try again" here would charge
+// them a second time for the same failed order, so this explicitly tells
+// them not to and how to get a refund instead.
+func chargedFailureMessage(reason, txRef string) string {
+	return fmt.Sprintf(
+		"Payment received, but the order could not be completed (%s). Do NOT pay again — email blvckmrkt.market@gmail.com with reference %s and we'll refund you.",
+		reason, txRef,
+	)
 }
 
 // ── Paystack hosted payment link ─────────────────────────────────────────────
@@ -553,23 +591,34 @@ func finalizePaystackIntent(intent *models.PaymentIntent, reference string) (mod
 	}
 
 	if verification.Data.Reference != intent.TxRef {
-		return models.Order{}, fmt.Errorf("Payment reference mismatch")
+		msg := chargedFailureMessage("payment reference mismatch", intent.TxRef)
+		database.DB.Model(intent).Updates(map[string]interface{}{
+			"status":         models.IntentFailed,
+			"failure_reason": msg,
+		})
+		return models.Order{}, fmt.Errorf("%s", msg)
 	}
 	expected := int64(math.Round(intent.Amount * 100))
 	if verification.Data.Amount != expected || !strings.EqualFold(verification.Data.Currency, intent.Currency) {
 		log.Printf("❌ Amount/currency mismatch for reference=%s: expected=%d %s got=%d %s",
 			intent.TxRef, expected, intent.Currency, verification.Data.Amount, verification.Data.Currency)
+		msg := chargedFailureMessage("amount/currency mismatch", intent.TxRef)
 		database.DB.Model(intent).Updates(map[string]interface{}{
 			"status":         models.IntentFailed,
-			"failure_reason": "Amount/currency mismatch",
+			"failure_reason": msg,
 		})
-		return models.Order{}, fmt.Errorf("Payment amount mismatch")
+		return models.Order{}, fmt.Errorf("%s", msg)
 	}
 
 	var req createOrderRequest
 	if err := json.Unmarshal([]byte(intent.Payload), &req); err != nil {
 		log.Printf("❌ Failed to unmarshal payment intent payload for reference=%s: %v", intent.TxRef, err)
-		return models.Order{}, fmt.Errorf("Failed to build order")
+		msg := chargedFailureMessage("internal error building your order", intent.TxRef)
+		database.DB.Model(intent).Updates(map[string]interface{}{
+			"status":         models.IntentFailed,
+			"failure_reason": msg,
+		})
+		return models.Order{}, fmt.Errorf("%s", msg)
 	}
 
 	channel := verification.Data.Channel
@@ -600,11 +649,12 @@ func finalizePaystackIntent(intent *models.PaymentIntent, reference string) (mod
 	})
 	if txErr != nil {
 		log.Printf("❌ Order build failed for reference=%s: %v", intent.TxRef, txErr)
+		msg := chargedFailureMessage(txErr.Error(), intent.TxRef)
 		database.DB.Model(intent).Updates(map[string]interface{}{
 			"status":         models.IntentFailed,
-			"failure_reason": txErr.Error(),
+			"failure_reason": msg,
 		})
-		return models.Order{}, txErr
+		return models.Order{}, fmt.Errorf("%s", msg)
 	}
 
 	database.DB.Model(intent).Updates(map[string]interface{}{
@@ -728,7 +778,7 @@ func FinalizePaystackPayment(c *gin.Context) {
 		return
 	}
 	if intent.Status == models.IntentFailed {
-		utils.BadRequest(c, "This payment failed"+condSuffix(intent.FailureReason), nil)
+		utils.BadRequest(c, alreadyFailedMessage(intent.FailureReason), nil)
 		return
 	}
 
