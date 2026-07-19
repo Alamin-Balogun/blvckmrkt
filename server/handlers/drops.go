@@ -7,6 +7,14 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// DropBrandInfo — the brand a drop's products belong to (a drop is assumed
+// to be single-brand, matching how brands actually create drops today).
+type DropBrandInfo struct {
+	ID        uint   `json:"id"`
+	BrandName string `json:"brand_name"`
+	LogoURL   string `json:"logo_url,omitempty"`
+}
+
 // PublicDropProduct — one product row inside a public drop response
 type PublicDropProduct struct {
 	ProductID    uint    `json:"product_id"`
@@ -97,8 +105,10 @@ func GetPublicDrops(c *gin.Context) {
 	var brands []models.Brand
 	database.DB.Where("id IN ?", brandIDSlice).Find(&brands)
 	brandMap := map[uint]string{}
+	brandByID := map[uint]models.Brand{}
 	for _, b := range brands {
 		brandMap[b.ID] = b.BrandName
+		brandByID[b.ID] = b
 	}
 
 	// Build product lookup
@@ -159,6 +169,7 @@ func GetPublicDrops(c *gin.Context) {
 	type DropResponse struct {
 		ID       uint                `json:"id"`
 		Name     string              `json:"name"`
+		Brand    *DropBrandInfo      `json:"brand,omitempty"`
 		Products []PublicDropProduct `json:"products"`
 	}
 	resp := make([]DropResponse, 0, len(drops))
@@ -167,9 +178,19 @@ func GetPublicDrops(c *gin.Context) {
 		if prods == nil {
 			prods = []PublicDropProduct{}
 		}
+
+		// A drop is single-brand in practice — derive it from the first product.
+		var brandInfo *DropBrandInfo
+		if len(prods) > 0 {
+			if b, ok := brandByID[prods[0].BrandID]; ok {
+				brandInfo = &DropBrandInfo{ID: b.ID, BrandName: b.BrandName, LogoURL: b.LogoURL}
+			}
+		}
+
 		resp = append(resp, DropResponse{
 			ID:       d.ID,
 			Name:     d.Name,
+			Brand:    brandInfo,
 			Products: prods,
 		})
 	}
