@@ -46,6 +46,12 @@ type Order struct {
 	AddressID     *uint          `gorm:"index"                                  json:"address_id"`
 	Subtotal      float64        `gorm:"type:decimal(10,2);not null"            json:"subtotal"`
 	ShippingFee   float64        `gorm:"type:decimal(10,2);default:0"           json:"shipping_fee"`
+	// Tax is the platform's commission, re-added at checkout as a line item
+	// (shown to buyers as "Tax") instead of only being baked into a lower
+	// Product.Price. It is derived per-item from (BrandPrice - Price) and is
+	// NOT included in any OrderItem.TotalPrice, so brand payouts (which sum
+	// OrderItem.TotalPrice) are unaffected — this amount stays with the platform.
+	Tax           float64        `gorm:"type:decimal(10,2);default:0"           json:"tax"`
 	Total         float64        `gorm:"type:decimal(10,2);not null"            json:"total"`
 	Currency      string         `gorm:"type:varchar(10);default:'NGN'"         json:"currency"`
 	

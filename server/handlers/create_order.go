@@ -75,6 +75,21 @@ type createOrderRequest struct {
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
+// itemTax is the platform's commission on one line item, re-surfaced at
+// checkout as "Tax" instead of only being baked into a lower Product.Price.
+// It's derived from the product's own BrandPrice/Price gap (set when the
+// product's price was last computed from the commission_rate admin
+// setting — see applyCommissionForBrand), not a separately-fetched rate, so
+// it always matches what was actually applied to that specific product and
+// respects any per-brand commission override. Guards against legacy rows
+// where BrandPrice was never set (defaults to 0) — no tax is charged there.
+func itemTax(product models.Product, qty int) float64 {
+	if product.BrandPrice <= product.Price {
+		return 0
+	}
+	return (product.BrandPrice - product.Price) * float64(qty)
+}
+
 func validatePaymentStatus(status string) bool {
 	for _, v := range []string{"unpaid", "pending", "paid", "failed", "refunded"} {
 		if v == status {
@@ -559,7 +574,7 @@ func buildOrder(
 	txErr := database.DB.Transaction(func(tx *gorm.DB) error {
 
 		var orderItems []models.OrderItem
-		var computedSubtotal float64
+		var computedSubtotal, computedTax float64
 
 		for i, it := range req.Items {
 			log.Printf("📦 Item %d: product_id=%d qty=%d", i+1, it.ProductID, it.Quantity)
@@ -575,6 +590,7 @@ func buildOrder(
 			}
 			lineTotal := unitPrice * float64(it.Quantity)
 			computedSubtotal += lineTotal
+			computedTax += itemTax(product, it.Quantity)
 
 			// Size & stock — the decrement is a single conditional UPDATE (not a
 			// read-then-write) so two orders racing for the last unit can't both
@@ -630,13 +646,13 @@ func buildOrder(
 		if discount < 0 {
 			discount = 0
 		}
-		orderTotal := computedSubtotal - discount + shippingFee
+		orderTotal := computedSubtotal - discount + shippingFee + computedTax
 		if orderTotal < 0 {
 			orderTotal = 0
 		}
 
-		log.Printf("💰 subtotal=%.2f discount=%.2f shipping=%.2f total=%.2f",
-			computedSubtotal, discount, shippingFee, orderTotal)
+		log.Printf("💰 subtotal=%.2f discount=%.2f shipping=%.2f tax=%.2f total=%.2f",
+			computedSubtotal, discount, shippingFee, computedTax, orderTotal)
 
 		// Notes
 		var noteParts []string
@@ -674,6 +690,7 @@ func buildOrder(
 			AddressID:     addressID,
 			Subtotal:      computedSubtotal,
 			ShippingFee:   shippingFee,
+			Tax:           computedTax,
 			Total:         orderTotal,
 			Currency:      req.Currency,
 			DeliveryType:  deliveryType,

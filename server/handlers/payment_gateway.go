@@ -96,7 +96,7 @@ func createFlutterwavePaymentLink(txRef string, amount float64, currency, email,
 // "current price wins" rule buildOrder applies — without touching stock, so we
 // know how much to charge before the order (and any stock decrement) exists.
 func quoteOrderTotal(req createOrderRequest) (float64, error) {
-	var subtotal float64
+	var subtotal, tax float64
 	for _, it := range req.Items {
 		var product models.Product
 		if err := database.DB.First(&product, it.ProductID).Error; err != nil {
@@ -107,6 +107,7 @@ func quoteOrderTotal(req createOrderRequest) (float64, error) {
 			unitPrice = it.UnitPrice
 		}
 		subtotal += unitPrice * float64(it.Quantity)
+		tax += itemTax(product, it.Quantity)
 	}
 
 	shippingFee := req.ShippingCost
@@ -117,7 +118,7 @@ func quoteOrderTotal(req createOrderRequest) (float64, error) {
 	if discount < 0 {
 		discount = 0
 	}
-	total := subtotal - discount + shippingFee
+	total := subtotal - discount + shippingFee + tax
 	if total < 0 {
 		total = 0
 	}
