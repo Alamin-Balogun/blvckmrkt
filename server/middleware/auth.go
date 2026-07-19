@@ -60,6 +60,42 @@ func Auth() gin.HandlerFunc {
 	}
 }
 
+// OptionalAuth injects user claims into context when a valid Bearer token is
+// present, but never aborts the request — used by public endpoints (e.g. the
+// community feed) that want to personalize the response (like state, etc.)
+// for logged-in visitors without requiring login to view.
+func OptionalAuth() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authHeader := c.GetHeader("Authorization")
+		parts := strings.SplitN(authHeader, " ", 2)
+		if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
+			c.Next()
+			return
+		}
+
+		tokenString := parts[1]
+
+		var blacklisted models.BlacklistedToken
+		if err := database.DB.
+			Where("token = ? AND expires_at > ?", tokenString, time.Now()).
+			First(&blacklisted).Error; err == nil {
+			c.Next()
+			return
+		}
+
+		claims, err := utils.ParseToken(tokenString)
+		if err != nil {
+			c.Next()
+			return
+		}
+
+		c.Set("userID", claims.UserID)
+		c.Set("email", claims.Email)
+		c.Set("accountType", claims.AccountType)
+		c.Next()
+	}
+}
+
 // RequireBrand ensures only brand accounts can access the brand dashboard.
 func RequireBrand() gin.HandlerFunc {
 	return func(c *gin.Context) {

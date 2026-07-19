@@ -91,6 +91,14 @@ func Register(r *gin.Engine) {
 		pages.GET("/:slug", handlers.AdminGetSitePage)
 	}
 
+	// ── Community feed (public browsing, OptionalAuth for like state) ──────────
+	community := api.Group("/community", middleware.OptionalAuth())
+	{
+		community.GET("/posts",              handlers.ListCommunityPosts)
+		community.GET("/posts/:id",          handlers.GetCommunityPost)
+		community.GET("/posts/:id/comments", handlers.ListCommunityComments)
+	}
+
 	// ── Cart, Wishlist, Reviews — all logged-in users ─────────────────────────
 	userShop := api.Group("/user", middleware.Auth())
 	{
@@ -120,6 +128,16 @@ func Register(r *gin.Engine) {
 		// Blog comments
 		userShop.POST("/blog/:slug/comments",   handlers.CreateBlogComment)
 		userShop.DELETE("/blog/comments/:id",   handlers.DeleteOwnBlogComment)
+
+		// Community (any logged-in account — buyer or brand)
+		userShop.POST("/community/posts",                  handlers.CreateCommunityPost)
+		userShop.PUT("/community/posts/:id",                handlers.UpdateCommunityPost)
+		userShop.DELETE("/community/posts/:id",             handlers.DeleteCommunityPost)
+		userShop.POST("/community/posts/:id/like",          handlers.ToggleCommunityLike)
+		userShop.POST("/community/posts/:id/comments",      handlers.CreateCommunityComment)
+		userShop.DELETE("/community/comments/:id",          handlers.DeleteCommunityComment)
+		userShop.POST("/community/posts/:id/report",        handlers.ReportCommunityPost)
+		userShop.POST("/community/comments/:id/report",     handlers.ReportCommunityComment)
 	}
 
 	// ── Guest checkout (public, no account required) ────────────────────────────

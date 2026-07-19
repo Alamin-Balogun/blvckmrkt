@@ -59,6 +59,12 @@ func main() {
 		&models.Blog{},
 		&models.BlogComment{},
 
+		// COMMUNITY
+		&models.CommunityPost{},
+		&models.CommunityComment{},
+		&models.CommunityLike{},
+		&models.CommunityReport{},
+
 		// DROPS
 		&models.Drop{},
 		&models.DropProduct{},

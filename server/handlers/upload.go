@@ -45,6 +45,7 @@ var allowedFolders = map[string]bool{
 	"receipts":   true,
 	"categories": true,
 	"blog":       true,
+	"community":  true,
 }
 
 // UploadImage handles general image uploads
