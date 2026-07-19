@@ -36,6 +36,7 @@ const BlogPost               = lazy(() => import("./pages/Blog/blog_components/b
 const Brands                 = lazy(() => import("./pages/Brands/Brands"));
 const BrandProfile           = lazy(() => import("./pages/Brands/BrandProfile"));
 const Drops                  = lazy(() => import("./pages/Drops/Drops"));
+const Community               = lazy(() => import("./pages/Community/Community"));
 const Detail                 = lazy(() => import("./pages/Detail/Detail"));
 const Checkout               = lazy(() => import("./pages/Checkout/Checkout"));
 const PaymentCallback        = lazy(() => import("./pages/PaymentCallback/PaymentCallback"));
@@ -116,6 +117,7 @@ createRoot(document.getElementById("root")).render(
                 <Route path="/brands"                    element={<Brands />} />
                 <Route path="/brands/:slug"              element={<BrandProfile />} />
                 <Route path="/drops"                     element={<Drops />} />
+                <Route path="/community"                 element={<Community />} />
                 <Route path="/sell"                      element={<Sell />} />
                 {/* Auth */}
                 <Route path="/signup"                    element={<AuthPage defaultMode="signup" />} />

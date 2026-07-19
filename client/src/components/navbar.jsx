@@ -28,6 +28,7 @@ const moreLinks = [
   {label: "Brands", path: "/brands"},
   {label: "Drops", path: "/drops"},
   {label: "Blog", path: "/blog"},
+  {label: "Community", path: "/community"},
 ];
 
 const MARQUEE_HEIGHT = 36;
