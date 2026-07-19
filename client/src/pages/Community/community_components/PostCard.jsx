@@ -3,11 +3,12 @@ import {Link} from "react-router-dom";
 import {motion, AnimatePresence} from "framer-motion";
 import {useAuth} from "../../Auth/context/authcontext";
 import {
-  CATEGORIES, categoryLabel, isLoggedIn,
+  CATEGORIES, categoryLabel, categoryStyle, isLoggedIn,
   toggleLike, updatePost, deletePost,
   listComments, createComment, deleteComment,
   reportPost, reportComment,
 } from "./api";
+import {HeartIcon, CommentIcon, DotsIcon, CheckBadgeIcon} from "./icons";
 
 function timeAgo(iso) {
   const diff = Date.now() - new Date(iso).getTime();
@@ -27,6 +28,13 @@ const btnBase = {
   color: "rgba(255,255,255,0.4)", fontSize: 12, fontWeight: 700,
   letterSpacing: "0.04em", padding: "6px 10px", borderRadius: 8,
   transition: "color 0.15s, background 0.15s",
+};
+
+const dotsBtnStyle = {
+  display: "flex", alignItems: "center", justifyContent: "center",
+  width: 28, height: 28, borderRadius: "50%",
+  background: "transparent", border: "none", color: "rgba(255,255,255,0.4)",
+  cursor: "pointer", transition: "background 0.15s",
 };
 
 export default function PostCard({post, onChanged}) {
@@ -166,84 +174,97 @@ export default function PostCard({post, onChanged}) {
     }
   };
 
+  const catColors = categoryStyle(post.category);
+  const [hovered, setHovered] = useState(false);
+
   return (
     <motion.div
       initial={{opacity: 0, y: 12}}
       animate={{opacity: 1, y: 0}}
       transition={{duration: 0.3}}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       style={{
-        background: "rgba(255,255,255,0.03)",
-        border: "1px solid rgba(255,255,255,0.08)",
-        borderRadius: 16, padding: "20px 22px", marginBottom: 18,
+        background: "#0d0d0d",
+        border: `1px solid ${hovered ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.08)"}`,
+        borderRadius: 18, padding: "22px 24px", marginBottom: 18,
+        boxShadow: hovered ? "0 10px 30px rgba(0,0,0,0.35)" : "none",
+        transition: "border-color 0.25s, box-shadow 0.25s",
       }}>
 
       {/* Header */}
-      <div style={{display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 14}}>
+      <div style={{display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 16}}>
         <div style={{
-          width: 42, height: 42, borderRadius: brand ? 10 : "50%", flexShrink: 0,
-          background: "rgba(239,68,68,0.15)", border: "1px solid rgba(255,255,255,0.1)",
+          width: 44, height: 44, borderRadius: brand ? 12 : "50%", flexShrink: 0,
+          background: "linear-gradient(135deg, rgba(239,68,68,0.25), rgba(239,68,68,0.08))",
+          border: "1.5px solid rgba(239,68,68,0.3)",
           overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center",
         }}>
           {(brand?.logo_url || author.avatar) ? (
             <img src={brand?.logo_url || author.avatar} alt={author.name}
               style={{width: "100%", height: "100%", objectFit: "cover"}} />
           ) : (
-            <span style={{color: "#ef4444", fontWeight: 700}}>{(author.name || "U")[0]?.toUpperCase()}</span>
+            <span style={{color: "#ef4444", fontWeight: 800, fontSize: 15}}>{(author.name || "U")[0]?.toUpperCase()}</span>
           )}
         </div>
 
         <div style={{flex: 1, minWidth: 0}}>
-          <div style={{display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap"}}>
+          <div style={{display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap"}}>
             {brand ? (
-              <Link to={`/brands/${brand.slug}`} style={{color: "#fff", fontSize: 13, fontWeight: 700, textDecoration: "none"}}>
+              <Link to={`/brands/${brand.slug}`} style={{color: "#fff", fontSize: 13.5, fontWeight: 800, textDecoration: "none", letterSpacing: "0.01em"}}
+                onMouseEnter={(e) => (e.currentTarget.style.color = "#ef4444")}
+                onMouseLeave={(e) => (e.currentTarget.style.color = "#fff")}>
                 {brand.brand_name}
               </Link>
             ) : (
-              <span style={{color: "#fff", fontSize: 13, fontWeight: 700}}>{author.name || "User"}</span>
+              <span style={{color: "#fff", fontSize: 13.5, fontWeight: 800}}>{author.name || "User"}</span>
             )}
             {brand && (
               <span style={{
-                fontSize: 8, fontWeight: 900, letterSpacing: "0.15em", textTransform: "uppercase",
-                padding: "2px 7px", borderRadius: 99, background: "rgba(239,68,68,0.15)",
+                display: "inline-flex", alignItems: "center", gap: 3,
+                fontSize: 8, fontWeight: 900, letterSpacing: "0.14em", textTransform: "uppercase",
+                padding: "2.5px 8px", borderRadius: 99, background: "rgba(239,68,68,0.14)",
                 color: "#ef4444", border: "1px solid rgba(239,68,68,0.3)",
               }}>
-                Brand{brand.verified ? " ✓" : ""}
+                {brand.verified && <CheckBadgeIcon size={9} />}
+                Brand
               </span>
             )}
           </div>
-          <p style={{color: "rgba(255,255,255,0.3)", fontSize: 10.5, letterSpacing: "0.05em", margin: "2px 0 0"}}>
+          <p style={{color: "rgba(255,255,255,0.32)", fontSize: 10.5, letterSpacing: "0.04em", margin: "3px 0 0"}}>
             {timeAgo(post.created_at)}
           </p>
         </div>
 
         <span style={{
-          fontSize: 8, fontWeight: 900, letterSpacing: "0.15em", textTransform: "uppercase",
-          padding: "4px 10px", borderRadius: 99, background: "rgba(255,255,255,0.06)",
-          color: "rgba(255,255,255,0.5)", border: "1px solid rgba(255,255,255,0.12)", whiteSpace: "nowrap",
+          fontSize: 8.5, fontWeight: 900, letterSpacing: "0.13em", textTransform: "uppercase",
+          padding: "5px 11px", borderRadius: 99, whiteSpace: "nowrap",
+          background: catColors.bg, color: catColors.color, border: `1px solid ${catColors.border}`,
         }}>
           {categoryLabel(post.category)}
         </span>
 
         {/* Menu */}
         <div style={{position: "relative"}}>
-          <button onClick={() => setMenuOpen((v) => !v)} style={{
-            background: "transparent", border: "none", color: "rgba(255,255,255,0.4)",
-            cursor: "pointer", fontSize: 18, lineHeight: 1, padding: "2px 6px",
-          }}>⋯</button>
+          <button onClick={() => setMenuOpen((v) => !v)} style={dotsBtnStyle}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.08)")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+            <DotsIcon />
+          </button>
           {menuOpen && (
             <div style={{
-              position: "absolute", right: 0, top: 26, zIndex: 10,
-              background: "#111", border: "1px solid rgba(255,255,255,0.12)",
+              position: "absolute", right: 0, top: 32, zIndex: 10,
+              background: "#161616", border: "1px solid rgba(255,255,255,0.12)",
               borderRadius: 10, overflow: "hidden", minWidth: 140,
-              boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
+              boxShadow: "0 12px 30px rgba(0,0,0,0.55)",
             }}>
               {isOwner ? (
                 <>
-                  <button onClick={() => {setEditing(true); setMenuOpen(false);}} style={menuItemStyle}>Edit</button>
-                  <button onClick={() => {setMenuOpen(false); handleDelete();}} style={{...menuItemStyle, color: "#ef4444"}}>Delete</button>
+                  <button onClick={() => {setEditing(true); setMenuOpen(false);}} className="community-menu-item" style={menuItemStyle}>Edit</button>
+                  <button onClick={() => {setMenuOpen(false); handleDelete();}} className="community-menu-item" style={{...menuItemStyle, color: "#ef4444"}}>Delete</button>
                 </>
               ) : (
-                <button onClick={handleReport} style={menuItemStyle}>Report</button>
+                <button onClick={handleReport} className="community-menu-item" style={menuItemStyle}>Report</button>
               )}
             </div>
           )}
@@ -253,9 +274,23 @@ export default function PostCard({post, onChanged}) {
       {/* Body / Edit form */}
       {editing ? (
         <div style={{marginBottom: 12}}>
-          <select value={editCategory} onChange={(e) => setEditCategory(e.target.value)} style={selectStyle}>
-            {CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-          </select>
+          <div style={{display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10}}>
+            {CATEGORIES.map((c) => {
+              const active = editCategory === c.value;
+              const colors = categoryStyle(c.value);
+              return (
+                <button key={c.value} onClick={() => setEditCategory(c.value)} style={{
+                  fontSize: 10.5, fontWeight: 700, padding: "6px 12px", borderRadius: 99, cursor: "pointer",
+                  border: active ? `1px solid ${colors.border}` : "1px solid rgba(255,255,255,0.12)",
+                  background: active ? colors.bg : "transparent",
+                  color: active ? colors.color : "rgba(255,255,255,0.4)",
+                  transition: "all 0.15s",
+                }}>
+                  {c.label}
+                </button>
+              );
+            })}
+          </div>
           <textarea value={editBody} onChange={(e) => setEditBody(e.target.value)} rows={4} style={textareaStyle} />
           <div style={{display: "flex", gap: 8, marginTop: 8}}>
             <button onClick={saveEdit} disabled={editBusy} style={primaryBtnStyle}>
@@ -273,21 +308,26 @@ export default function PostCard({post, onChanged}) {
       )}
 
       {post.image_url && !editing && (
-        <img src={post.image_url} alt="" style={{
-          width: "100%", maxHeight: 420, objectFit: "cover", borderRadius: 12, marginBottom: 14,
-          border: "1px solid rgba(255,255,255,0.08)",
-        }} />
+        <div style={{borderRadius: 14, overflow: "hidden", marginBottom: 16, border: "1px solid rgba(255,255,255,0.08)"}}>
+          <img src={post.image_url} alt="" style={{
+            width: "100%", maxHeight: 460, objectFit: "cover", display: "block", filter: "grayscale(6%)",
+          }} />
+        </div>
       )}
 
       {error && <p style={{color: "#ef4444", fontSize: 11, marginBottom: 10}}>{error}</p>}
 
       {/* Actions */}
-      <div style={{display: "flex", gap: 6, borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 10}}>
-        <button onClick={handleLike} style={{...btnBase, color: liked ? "#ef4444" : btnBase.color}}>
-          {liked ? "♥" : "♡"} {likeCount}
+      <div style={{display: "flex", gap: 4, borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 12, marginTop: 2}}>
+        <button onClick={handleLike} style={{...btnBase, color: liked ? "#ef4444" : btnBase.color}}
+          onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.06)")}
+          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+          <HeartIcon filled={liked} /> {likeCount}
         </button>
-        <button onClick={loadComments} style={btnBase}>
-          💬 {post.comment_count}
+        <button onClick={loadComments} style={btnBase}
+          onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.06)")}
+          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+          <CommentIcon /> {post.comment_count}
         </button>
       </div>
 
@@ -368,12 +408,6 @@ const menuItemStyle = {
   display: "block", width: "100%", textAlign: "left", background: "transparent",
   border: "none", color: "rgba(255,255,255,0.8)", fontSize: 12, fontWeight: 600,
   padding: "10px 14px", cursor: "pointer",
-};
-
-const selectStyle = {
-  width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.04)",
-  border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff",
-  fontSize: 12, padding: "8px 10px", marginBottom: 8, outline: "none",
 };
 
 const textareaStyle = {

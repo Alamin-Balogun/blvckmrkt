@@ -34,6 +34,17 @@ export function categoryLabel(value) {
   return CATEGORIES.find((c) => c.value === value)?.label || "General Discussion";
 }
 
+const CATEGORY_COLORS = {
+  general:         {color: "rgba(255,255,255,0.65)", bg: "rgba(255,255,255,0.08)", border: "rgba(255,255,255,0.22)"},
+  design_feedback: {color: "#f59e0b", bg: "rgba(245,158,11,0.12)", border: "rgba(245,158,11,0.35)"},
+  showcase:        {color: "#10b981", bg: "rgba(16,185,129,0.12)", border: "rgba(16,185,129,0.35)"},
+  question:        {color: "#38bdf8", bg: "rgba(56,189,248,0.12)", border: "rgba(56,189,248,0.35)"},
+};
+
+export function categoryStyle(value) {
+  return CATEGORY_COLORS[value] || CATEGORY_COLORS.general;
+}
+
 // ── Public (optional auth) ────────────────────────────────────────────────────
 export function listPosts({category = "", sort = "newest", page = 1, limit = 10} = {}) {
   const token = getToken();
