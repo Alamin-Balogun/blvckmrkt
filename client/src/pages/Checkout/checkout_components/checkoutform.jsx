@@ -1020,6 +1020,7 @@ const cityOptions = useMemo(() => {
       brandId: ci.product?.brand_id,
       size: ci.selected_size ?? "—",
       price: Number(ci.product?.price ?? 0),
+      comparePrice: Number(ci.product?.compare_price ?? 0),
       qty: ci.quantity ?? 1,
       image: ci.product?.primary_image ?? "",
       slug: ci.product?.slug ?? ci.product_id,
@@ -1064,6 +1065,17 @@ const cityOptions = useMemo(() => {
       : convert(appliedCoupon.value, baseCurrency)
     : convert(passedDiscount, baseCurrency);
 
+  // Tax — the platform's commission, re-surfaced here as a checkout line
+  // instead of only being baked into the (already-discounted) product price.
+  // Mirrors the server's itemTax() in create_order.go exactly: per item,
+  // (comparePrice - price) is the fee that was deducted when the price was
+  // set, converted to the buyer's display currency and summed across items.
+  const tax = items.reduce((s, i) => {
+    const cmp = convert(i.comparePrice || 0, baseCurrency);
+    const price = convert(i.price, baseCurrency);
+    return s + Math.max(0, cmp - price) * i.qty;
+  }, 0);
+
   const deliveryCost = useMemo(() => {
     if (deliveryMode !== "delivery") return 0;
     // Cart flow: sum up all non-pickup methods from the live (mutable) brandShippingMap
@@ -1092,7 +1104,7 @@ const cityOptions = useMemo(() => {
     return convert(rawPrice, fromCurrency);
   }, [selectedShippingMethod, deliveryMode, convert, baseCurrency, brandShippingMap, passedBrandShippingMap]);
 
-  const orderTotal = Math.max(0, subtotal - discount + deliveryCost);
+  const orderTotal = Math.max(0, subtotal - discount + deliveryCost + tax);
 
   // ✅ Shared order payload — everything CreateOrder needs except the `payment`
   // block, which differs per method (gateway reference, transfer receipt, ...).
@@ -3419,6 +3431,12 @@ if (!delivery.country_code && geoLoaded) {
                   {deliveryCost === 0 ? "FREE" : fmtMoney(deliveryCost)}
                 </span>
               </div>
+              {tax > 0 && (
+                <div className="co-sum-row">
+                  <span className="co-sum-label">Tax</span>
+                  <span className="co-sum-value">{fmtMoney(tax)}</span>
+                </div>
+              )}
               <div className="co-sum-divider" />
               <div className="co-sum-row" style={{paddingTop: 10}}>
                 <span

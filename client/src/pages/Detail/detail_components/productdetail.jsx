@@ -184,6 +184,7 @@ const handleBuyNow = () => {
         size: selectedSize || "—",
         sizeId: selectedSizeId,
         price: Number(product.price),
+        comparePrice: Number(product.compare_price ?? 0),
         qty: qty,
         image: product.primary_image || product.images?.[0]?.url || "",
         slug: product.slug,

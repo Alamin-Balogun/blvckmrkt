@@ -585,7 +585,7 @@ export default function AdminSettings() {
           </Row>
           <Row
             label="Platform Commission (Default)"
-            desc="Default percentage taken from each sale — can be overridden per brand below">
+            desc="Deducted from each brand's listed price, then re-added at checkout as a buyer-facing Tax line. Can be overridden per brand below.">
             <SettingInput
               value={values.commission_rate}
               onChange={set("commission_rate")}

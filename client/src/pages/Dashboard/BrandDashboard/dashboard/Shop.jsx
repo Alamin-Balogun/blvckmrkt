@@ -593,7 +593,12 @@ const extractLocationFromMethod = useCallback((method) => {
 
 
   const itemTotal = product.price * qty;
-  const orderTotal = itemTotal + deliveryCost;
+  // Tax — the platform's commission, re-surfaced here as a checkout line
+  // instead of only being baked into the (already-discounted) product price.
+  // (compare_price - price) is exactly the fee that was deducted when the
+  // price was set — mirrors the server's itemTax() in create_order.go.
+  const tax = Math.max(0, (product.compare_price || 0) - product.price) * qty;
+  const orderTotal = itemTotal + deliveryCost + tax;
 
   // ✅ NEW: Payment timeout (1 minute auto-close)
   useEffect(() => {
@@ -2721,6 +2726,15 @@ val: selectedShippingMethod ? (
                         {deliveryCost === 0 ? "FREE" : fmtMoney(deliveryCost)}
                       </span>
                     </div>
+                    {tax > 0 && (
+                      <div
+                        style={{display: "flex", justifyContent: "space-between", marginBottom: 8}}>
+                        <span style={{color: "rgba(255,255,255,0.4)", fontSize: 12}}>Tax</span>
+                        <span style={{color: "rgba(255,255,255,0.7)", fontSize: 12, fontWeight: 700}}>
+                          {fmtMoney(tax)}
+                        </span>
+                      </div>
+                    )}
                     {product.compare_price > 0 && product.compare_price !== product.price && (
                       <div
                         style={{display: "flex", justifyContent: "space-between", marginBottom: 8}}>
