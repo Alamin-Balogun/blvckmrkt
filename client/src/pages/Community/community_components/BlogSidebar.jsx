@@ -27,7 +27,7 @@ export default function BlogSidebar() {
       .catch(() => setError(true));
   }, []);
 
-  if (error || posts?.length === 0) return null;
+  const empty = posts !== null && posts.length === 0;
 
   return (
     <div style={{
@@ -50,7 +50,7 @@ export default function BlogSidebar() {
         </div>
       </div>
 
-      {posts === null && (
+      {posts === null && !error && (
         <div style={{display: "flex", flexDirection: "column", gap: 14}}>
           {[1, 2, 3].map((i) => (
             <div key={i} style={{display: "flex", gap: 10}}>
@@ -61,6 +61,16 @@ export default function BlogSidebar() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {(error || empty) && (
+        <div style={{textAlign: "center", padding: "26px 8px"}}>
+          <p style={{color: "rgba(255,255,255,0.3)", fontSize: 12, lineHeight: 1.6, margin: 0}}>
+            {error
+              ? "Couldn't load the blog right now."
+              : "No posts yet — check back soon for brand stories and style drops."}
+          </p>
         </div>
       )}
 
