@@ -4,6 +4,8 @@ import Navbar from "../../components/navbar";
 import Footer from "../../components/footer";
 import {getToken} from "../../components/cartcontext";
 import BrandHeroStory from "./brand_components/BrandHeroStory";
+import GarmentGallery from "./brand_components/GarmentGallery";
+import {buildGarments, hasGarmentShowcase} from "./brand_components/garmentData";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "https://blvckmrktng.com";
 
@@ -201,7 +203,7 @@ export default function BrandProfile() {
       <Navbar />
 
       {/* Banner — animated hero showcase when the brand has opted in, plain banner otherwise */}
-      {brand.hero_center_image_url ? (
+      {hasGarmentShowcase(brand) ? (
         <BrandHeroStory brand={brand} />
       ) : (
         <div style={{position: "relative", height: "clamp(220px, 32vw, 380px)", overflow: "hidden", background: "#111"}}>
@@ -217,7 +219,7 @@ export default function BrandProfile() {
       {/* Header — pulled up over the plain banner's gradient fade; the hero
           showcase ends in its own near-white section instead, so it doesn't
           need (and shouldn't get) that overlap. */}
-      <div style={{maxWidth: 1100, margin: brand.hero_center_image_url ? "40px auto 0" : "-64px auto 0", padding: "0 24px", position: "relative", zIndex: 2}}>
+      <div style={{maxWidth: 1100, margin: hasGarmentShowcase(brand) ? "40px auto 0" : "-64px auto 0", padding: "0 24px", position: "relative", zIndex: 2}}>
         <div style={{display: "flex", alignItems: "flex-end", gap: 20, flexWrap: "wrap", marginBottom: 24}}>
           <div style={{
             width: 108, height: 108, borderRadius: 16, overflow: "hidden",
@@ -304,6 +306,8 @@ export default function BrandProfile() {
             ) : null
           )}
         </div>
+
+        <GarmentGallery garments={buildGarments(brand)} />
 
         {/* Products */}
         <p style={{
