@@ -1,4 +1,5 @@
 import {useState} from "react";
+import ScrollCue from "./ScrollCue";
 
 export default function PersonalizationSection({brandName, image}) {
   const [editing, setEditing] = useState(false);
@@ -71,12 +72,7 @@ export default function PersonalizationSection({brandName, image}) {
         {shared ? "Link Copied ✓" : "Share"}
       </button>
 
-      <p style={{
-        color: "rgba(0,0,0,0.3)", fontSize: 10, fontWeight: 700, letterSpacing: "0.2em",
-        textTransform: "uppercase", marginTop: 40,
-      }}>
-        ↓ Scroll to shop {brandName}
-      </p>
+      <ScrollCue label={`Scroll down to shop ${brandName}`} dark={false} />
     </div>
   );
 }

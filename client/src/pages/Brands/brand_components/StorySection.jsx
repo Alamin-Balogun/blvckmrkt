@@ -2,6 +2,7 @@ import {useRef, useEffect, useState} from "react";
 import {motion, useScroll, useTransform} from "framer-motion";
 import ScrambleText from "./ScrambleText";
 import GlitchTransition from "./GlitchTransition";
+import ScrollCue from "./ScrollCue";
 
 const TINTS = [
   "linear-gradient(160deg, rgba(239,68,68,0.16), #0a0a0a 65%)",
@@ -69,10 +70,7 @@ export default function StorySection({image, headline, index}) {
         <ScrambleText text={headline} active={headlineActive} />
       </motion.p>
 
-      <div style={{
-        position: "absolute", bottom: 28, left: "50%", transform: "translateX(-50%)",
-        width: 6, height: 6, borderRadius: "50%", background: "rgba(255,255,255,0.3)",
-      }} />
+      <ScrollCue />
     </div>
   );
 }
