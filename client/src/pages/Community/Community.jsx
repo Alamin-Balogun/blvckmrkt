@@ -8,6 +8,7 @@ import {CATEGORIES, categoryStyle, listPosts} from "./community_components/api";
 import {PlusIcon} from "./community_components/icons";
 import PostCard from "./community_components/PostCard";
 import ComposerModal from "./community_components/ComposerModal";
+import BlogSidebar from "./community_components/BlogSidebar";
 
 const HERO_IMAGE = "https://images.unsplash.com/photo-1523398002811-999ca8dec234?w=1600&q=80";
 
@@ -74,7 +75,8 @@ export default function Community() {
         </p>
       </div>
 
-      <div style={{maxWidth: 760, margin: "0 auto", padding: "36px 24px 110px"}}>
+      <div style={{maxWidth: 1140, margin: "0 auto", padding: "36px 24px 110px", display: "flex", gap: 40, alignItems: "flex-start"}}>
+      <main style={{flex: 1, minWidth: 0, maxWidth: 760}}>
 
         {/* ── Toolbar ──────────────────────────────────────────────────────── */}
         <div style={toolbarStyle}>
@@ -145,6 +147,11 @@ export default function Community() {
             </button>
           </div>
         )}
+      </main>
+
+      <aside className="community-sidebar" style={{width: 300, flexShrink: 0, position: "sticky", top: 108}}>
+        <BlogSidebar />
+      </aside>
       </div>
 
       {showComposer && (
@@ -161,6 +168,7 @@ export default function Community() {
       <style>{`
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
         .community-menu-item:hover { background: rgba(255,255,255,0.06); }
+        @media (max-width: 1023px) { .community-sidebar { display: none; } }
       `}</style>
     </div>
   );
