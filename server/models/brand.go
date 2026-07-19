@@ -26,21 +26,6 @@ type Brand struct {
 	Description        string             `gorm:"type:text"                                                       json:"description,omitempty"`
 	LogoURL            string             `gorm:"type:varchar(512)"                                               json:"logo_url,omitempty"`
 	BannerURL          string             `gorm:"type:varchar(512)"                                               json:"banner_url,omitempty"`
-	Garment1FrontImageURL string           `gorm:"column:garment_1_front_image_url;type:varchar(512)"              json:"garment_1_front_image_url,omitempty"`
-	Garment1BackImageURL  string           `gorm:"column:garment_1_back_image_url;type:varchar(512)"               json:"garment_1_back_image_url,omitempty"`
-	Garment1LeftImageURL  string           `gorm:"column:garment_1_left_image_url;type:varchar(512)"               json:"garment_1_left_image_url,omitempty"`
-	Garment1RightImageURL string           `gorm:"column:garment_1_right_image_url;type:varchar(512)"              json:"garment_1_right_image_url,omitempty"`
-	Garment2FrontImageURL string           `gorm:"column:garment_2_front_image_url;type:varchar(512)"              json:"garment_2_front_image_url,omitempty"`
-	Garment2BackImageURL  string           `gorm:"column:garment_2_back_image_url;type:varchar(512)"               json:"garment_2_back_image_url,omitempty"`
-	Garment2LeftImageURL  string           `gorm:"column:garment_2_left_image_url;type:varchar(512)"               json:"garment_2_left_image_url,omitempty"`
-	Garment2RightImageURL string           `gorm:"column:garment_2_right_image_url;type:varchar(512)"              json:"garment_2_right_image_url,omitempty"`
-	Garment3FrontImageURL string           `gorm:"column:garment_3_front_image_url;type:varchar(512)"              json:"garment_3_front_image_url,omitempty"`
-	Garment3BackImageURL  string           `gorm:"column:garment_3_back_image_url;type:varchar(512)"               json:"garment_3_back_image_url,omitempty"`
-	Garment3LeftImageURL  string           `gorm:"column:garment_3_left_image_url;type:varchar(512)"               json:"garment_3_left_image_url,omitempty"`
-	Garment3RightImageURL string           `gorm:"column:garment_3_right_image_url;type:varchar(512)"              json:"garment_3_right_image_url,omitempty"`
-	StoryLine1         string             `gorm:"column:story_line_1;type:varchar(160)"                           json:"story_line_1,omitempty"`
-	StoryLine2         string             `gorm:"column:story_line_2;type:varchar(160)"                           json:"story_line_2,omitempty"`
-	StoryLine3         string             `gorm:"column:story_line_3;type:varchar(160)"                           json:"story_line_3,omitempty"`
 	Website            string             `gorm:"type:varchar(255)"                                               json:"website,omitempty"`
 	Category           string             `gorm:"type:varchar(100)"                                               json:"category,omitempty"`
 	Instagram          string             `gorm:"type:varchar(100)"                                               json:"instagram,omitempty"`
@@ -102,21 +87,6 @@ type BrandResponse struct {
 	Description         string             `json:"description,omitempty"`
 	LogoURL             string             `json:"logo_url,omitempty"`
 	BannerURL           string             `json:"banner_url,omitempty"`
-	Garment1FrontImageURL string           `json:"garment_1_front_image_url,omitempty"`
-	Garment1BackImageURL  string           `json:"garment_1_back_image_url,omitempty"`
-	Garment1LeftImageURL  string           `json:"garment_1_left_image_url,omitempty"`
-	Garment1RightImageURL string           `json:"garment_1_right_image_url,omitempty"`
-	Garment2FrontImageURL string           `json:"garment_2_front_image_url,omitempty"`
-	Garment2BackImageURL  string           `json:"garment_2_back_image_url,omitempty"`
-	Garment2LeftImageURL  string           `json:"garment_2_left_image_url,omitempty"`
-	Garment2RightImageURL string           `json:"garment_2_right_image_url,omitempty"`
-	Garment3FrontImageURL string           `json:"garment_3_front_image_url,omitempty"`
-	Garment3BackImageURL  string           `json:"garment_3_back_image_url,omitempty"`
-	Garment3LeftImageURL  string           `json:"garment_3_left_image_url,omitempty"`
-	Garment3RightImageURL string           `json:"garment_3_right_image_url,omitempty"`
-	StoryLine1          string             `json:"story_line_1,omitempty"`
-	StoryLine2          string             `json:"story_line_2,omitempty"`
-	StoryLine3          string             `json:"story_line_3,omitempty"`
 	Website             string             `json:"website,omitempty"`
 	Category            string             `json:"category,omitempty"`
 	Instagram           string             `json:"instagram,omitempty"`
@@ -148,21 +118,6 @@ func (b *Brand) ToResponse() BrandResponse {
 		Description:         b.Description,
 		LogoURL:             b.LogoURL,
 		BannerURL:           b.BannerURL,
-		Garment1FrontImageURL: b.Garment1FrontImageURL,
-		Garment1BackImageURL:  b.Garment1BackImageURL,
-		Garment1LeftImageURL:  b.Garment1LeftImageURL,
-		Garment1RightImageURL: b.Garment1RightImageURL,
-		Garment2FrontImageURL: b.Garment2FrontImageURL,
-		Garment2BackImageURL:  b.Garment2BackImageURL,
-		Garment2LeftImageURL:  b.Garment2LeftImageURL,
-		Garment2RightImageURL: b.Garment2RightImageURL,
-		Garment3FrontImageURL: b.Garment3FrontImageURL,
-		Garment3BackImageURL:  b.Garment3BackImageURL,
-		Garment3LeftImageURL:  b.Garment3LeftImageURL,
-		Garment3RightImageURL: b.Garment3RightImageURL,
-		StoryLine1:          b.StoryLine1,
-		StoryLine2:          b.StoryLine2,
-		StoryLine3:          b.StoryLine3,
 		Website:             b.Website,
 		Category:            b.Category,
 		Instagram:           b.Instagram,

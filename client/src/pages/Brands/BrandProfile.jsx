@@ -3,9 +3,6 @@ import {useParams, Link, useNavigate} from "react-router-dom";
 import Navbar from "../../components/navbar";
 import Footer from "../../components/footer";
 import {getToken} from "../../components/cartcontext";
-import BrandHeroStory from "./brand_components/BrandHeroStory";
-import GarmentGallery from "./brand_components/GarmentGallery";
-import {buildGarments, hasGarmentShowcase} from "./brand_components/garmentData";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "https://blvckmrktng.com";
 
@@ -202,24 +199,18 @@ export default function BrandProfile() {
     <div style={{background: "#0a0a0a", minHeight: "100vh"}}>
       <Navbar />
 
-      {/* Banner — animated hero showcase when the brand has opted in, plain banner otherwise */}
-      {hasGarmentShowcase(brand) ? (
-        <BrandHeroStory brand={brand} />
-      ) : (
-        <div style={{position: "relative", height: "clamp(220px, 32vw, 380px)", overflow: "hidden", background: "#111"}}>
-          {brand.banner_url ? (
-            <img src={brand.banner_url} alt="" style={{width: "100%", height: "100%", objectFit: "cover"}} />
-          ) : (
-            <div style={{width: "100%", height: "100%", background: "linear-gradient(135deg, #1a1a1a, #0a0a0a)"}} />
-          )}
-          <div style={{position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,0.2), #0a0a0a)"}} />
-        </div>
-      )}
+      {/* Banner */}
+      <div style={{position: "relative", height: "clamp(220px, 32vw, 380px)", overflow: "hidden", background: "#111"}}>
+        {brand.banner_url ? (
+          <img src={brand.banner_url} alt="" style={{width: "100%", height: "100%", objectFit: "cover"}} />
+        ) : (
+          <div style={{width: "100%", height: "100%", background: "linear-gradient(135deg, #1a1a1a, #0a0a0a)"}} />
+        )}
+        <div style={{position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,0.2), #0a0a0a)"}} />
+      </div>
 
-      {/* Header — pulled up over the plain banner's gradient fade; the hero
-          showcase ends in its own near-white section instead, so it doesn't
-          need (and shouldn't get) that overlap. */}
-      <div style={{maxWidth: 1100, margin: hasGarmentShowcase(brand) ? "40px auto 0" : "-64px auto 0", padding: "0 24px", position: "relative", zIndex: 2}}>
+      {/* Header — pulled up over the banner's gradient fade */}
+      <div style={{maxWidth: 1100, margin: "-64px auto 0", padding: "0 24px", position: "relative", zIndex: 2}}>
         <div style={{display: "flex", alignItems: "flex-end", gap: 20, flexWrap: "wrap", marginBottom: 24}}>
           <div style={{
             width: 108, height: 108, borderRadius: 16, overflow: "hidden",
@@ -306,8 +297,6 @@ export default function BrandProfile() {
             ) : null
           )}
         </div>
-
-        <GarmentGallery garments={buildGarments(brand)} />
 
         {/* Products */}
         <p style={{

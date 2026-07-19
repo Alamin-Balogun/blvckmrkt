@@ -49,21 +49,6 @@ func UpdateBrandProfile(c *gin.Context) {
 		Description string `json:"description"`
 		LogoURL     string `json:"logo_url"`
 		BannerURL   string `json:"banner_url"`
-		Garment1FrontImageURL string `json:"garment_1_front_image_url"`
-		Garment1BackImageURL  string `json:"garment_1_back_image_url"`
-		Garment1LeftImageURL  string `json:"garment_1_left_image_url"`
-		Garment1RightImageURL string `json:"garment_1_right_image_url"`
-		Garment2FrontImageURL string `json:"garment_2_front_image_url"`
-		Garment2BackImageURL  string `json:"garment_2_back_image_url"`
-		Garment2LeftImageURL  string `json:"garment_2_left_image_url"`
-		Garment2RightImageURL string `json:"garment_2_right_image_url"`
-		Garment3FrontImageURL string `json:"garment_3_front_image_url"`
-		Garment3BackImageURL  string `json:"garment_3_back_image_url"`
-		Garment3LeftImageURL  string `json:"garment_3_left_image_url"`
-		Garment3RightImageURL string `json:"garment_3_right_image_url"`
-		StoryLine1         string `json:"story_line_1"`
-		StoryLine2         string `json:"story_line_2"`
-		StoryLine3         string `json:"story_line_3"`
 		Website     string `json:"website"`
 		Category    string `json:"category"`
 		Instagram   string `json:"instagram"`
@@ -125,25 +110,10 @@ func UpdateBrandProfile(c *gin.Context) {
 
 // ── Update brands table ───────────────────────────────────────────────────
 log.Printf("[UpdateBrandProfile] updating brand for user %d", userID)
-if err := database.DB.Exec(`UPDATE brands SET brand_name = ?, logo_url = ?, banner_url = ?, garment_1_front_image_url = ?, garment_1_back_image_url = ?, garment_1_left_image_url = ?, garment_1_right_image_url = ?, garment_2_front_image_url = ?, garment_2_back_image_url = ?, garment_2_left_image_url = ?, garment_2_right_image_url = ?, garment_3_front_image_url = ?, garment_3_back_image_url = ?, garment_3_left_image_url = ?, garment_3_right_image_url = ?, story_line_1 = ?, story_line_2 = ?, story_line_3 = ?, description = ?, website = ?, category = ?, instagram = ?, facebook = ?, twitter = ?, tik_tok = ?, phone = ?, updated_at = NOW() WHERE user_id = ? AND deleted_at IS NULL`,
+if err := database.DB.Exec(`UPDATE brands SET brand_name = ?, logo_url = ?, banner_url = ?, description = ?, website = ?, category = ?, instagram = ?, facebook = ?, twitter = ?, tik_tok = ?, phone = ?, updated_at = NOW() WHERE user_id = ? AND deleted_at IS NULL`,
     strings.TrimSpace(req.BrandName),
     req.LogoURL,
     req.BannerURL,
-    req.Garment1FrontImageURL,
-    req.Garment1BackImageURL,
-    req.Garment1LeftImageURL,
-    req.Garment1RightImageURL,
-    req.Garment2FrontImageURL,
-    req.Garment2BackImageURL,
-    req.Garment2LeftImageURL,
-    req.Garment2RightImageURL,
-    req.Garment3FrontImageURL,
-    req.Garment3BackImageURL,
-    req.Garment3LeftImageURL,
-    req.Garment3RightImageURL,
-    strings.TrimSpace(req.StoryLine1),
-    strings.TrimSpace(req.StoryLine2),
-    strings.TrimSpace(req.StoryLine3),
     strings.TrimSpace(req.Description),
     strings.TrimSpace(req.Website),
     strings.TrimSpace(req.Category),
@@ -183,21 +153,6 @@ type BrandProfileResponse struct {
 	Description        string                    `json:"description"`
 	LogoURL            string                    `json:"logo_url"`
 	BannerURL          string                    `json:"banner_url"`
-	Garment1FrontImageURL string                  `json:"garment_1_front_image_url"`
-	Garment1BackImageURL  string                  `json:"garment_1_back_image_url"`
-	Garment1LeftImageURL  string                  `json:"garment_1_left_image_url"`
-	Garment1RightImageURL string                  `json:"garment_1_right_image_url"`
-	Garment2FrontImageURL string                  `json:"garment_2_front_image_url"`
-	Garment2BackImageURL  string                  `json:"garment_2_back_image_url"`
-	Garment2LeftImageURL  string                  `json:"garment_2_left_image_url"`
-	Garment2RightImageURL string                  `json:"garment_2_right_image_url"`
-	Garment3FrontImageURL string                  `json:"garment_3_front_image_url"`
-	Garment3BackImageURL  string                  `json:"garment_3_back_image_url"`
-	Garment3LeftImageURL  string                  `json:"garment_3_left_image_url"`
-	Garment3RightImageURL string                  `json:"garment_3_right_image_url"`
-	StoryLine1         string                    `json:"story_line_1"`
-	StoryLine2         string                    `json:"story_line_2"`
-	StoryLine3         string                    `json:"story_line_3"`
 	Website            string                    `json:"website"`
 	Category           string                    `json:"category"`
 	Instagram          string                    `json:"instagram"`
@@ -247,21 +202,6 @@ func buildBrandProfileResponse(user models.User, brand models.Brand) BrandProfil
 		Description:         brand.Description,
 		LogoURL:             brand.LogoURL,
 		BannerURL:           brand.BannerURL,
-		Garment1FrontImageURL: brand.Garment1FrontImageURL,
-		Garment1BackImageURL:  brand.Garment1BackImageURL,
-		Garment1LeftImageURL:  brand.Garment1LeftImageURL,
-		Garment1RightImageURL: brand.Garment1RightImageURL,
-		Garment2FrontImageURL: brand.Garment2FrontImageURL,
-		Garment2BackImageURL:  brand.Garment2BackImageURL,
-		Garment2LeftImageURL:  brand.Garment2LeftImageURL,
-		Garment2RightImageURL: brand.Garment2RightImageURL,
-		Garment3FrontImageURL: brand.Garment3FrontImageURL,
-		Garment3BackImageURL:  brand.Garment3BackImageURL,
-		Garment3LeftImageURL:  brand.Garment3LeftImageURL,
-		Garment3RightImageURL: brand.Garment3RightImageURL,
-		StoryLine1:          brand.StoryLine1,
-		StoryLine2:          brand.StoryLine2,
-		StoryLine3:          brand.StoryLine3,
 		Website:             brand.Website,
 		Category:            brand.Category,
 		Instagram:           brand.Instagram,

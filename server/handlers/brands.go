@@ -95,29 +95,6 @@ type PublicBrandProfile struct {
 	Twitter   string `json:"twitter"`
 	TikTok    string `json:"tiktok"`
 	Phone     string `json:"phone"`
-
-	// Optional animated garment showcase — empty strings when the brand
-	// hasn't opted in, so the frontend falls back to the plain static banner.
-	// Explicit gorm column tags are required here: this struct is populated
-	// via Raw(...).Scan(), and GORM's default snake_case conversion does not
-	// insert an underscore before a digit that follows a letter (e.g.
-	// "Garment1FrontImageURL" -> "garment1_front_image_url"), which would
-	// silently fail to bind against our "garment_1_front_image_url" alias.
-	Garment1FrontImageURL string `gorm:"column:garment_1_front_image_url" json:"garment_1_front_image_url"`
-	Garment1BackImageURL  string `gorm:"column:garment_1_back_image_url"  json:"garment_1_back_image_url"`
-	Garment1LeftImageURL  string `gorm:"column:garment_1_left_image_url"  json:"garment_1_left_image_url"`
-	Garment1RightImageURL string `gorm:"column:garment_1_right_image_url" json:"garment_1_right_image_url"`
-	Garment2FrontImageURL string `gorm:"column:garment_2_front_image_url" json:"garment_2_front_image_url"`
-	Garment2BackImageURL  string `gorm:"column:garment_2_back_image_url"  json:"garment_2_back_image_url"`
-	Garment2LeftImageURL  string `gorm:"column:garment_2_left_image_url"  json:"garment_2_left_image_url"`
-	Garment2RightImageURL string `gorm:"column:garment_2_right_image_url" json:"garment_2_right_image_url"`
-	Garment3FrontImageURL string `gorm:"column:garment_3_front_image_url" json:"garment_3_front_image_url"`
-	Garment3BackImageURL  string `gorm:"column:garment_3_back_image_url"  json:"garment_3_back_image_url"`
-	Garment3LeftImageURL  string `gorm:"column:garment_3_left_image_url"  json:"garment_3_left_image_url"`
-	Garment3RightImageURL string `gorm:"column:garment_3_right_image_url" json:"garment_3_right_image_url"`
-	StoryLine1         string `gorm:"column:story_line_1" json:"story_line_1"`
-	StoryLine2         string `gorm:"column:story_line_2" json:"story_line_2"`
-	StoryLine3         string `gorm:"column:story_line_3" json:"story_line_3"`
 }
 
 // GET /api/brands/:slug
@@ -146,22 +123,7 @@ func GetPublicBrandBySlug(c *gin.Context) {
 			COALESCE(b.facebook, '')  AS facebook,
 			COALESCE(b.twitter, '')   AS twitter,
 			COALESCE(b.tik_tok, '')   AS tiktok,
-			COALESCE(b.phone, '')     AS phone,
-			COALESCE(b.garment_1_front_image_url, '') AS garment_1_front_image_url,
-			COALESCE(b.garment_1_back_image_url, '')  AS garment_1_back_image_url,
-			COALESCE(b.garment_1_left_image_url, '')  AS garment_1_left_image_url,
-			COALESCE(b.garment_1_right_image_url, '') AS garment_1_right_image_url,
-			COALESCE(b.garment_2_front_image_url, '') AS garment_2_front_image_url,
-			COALESCE(b.garment_2_back_image_url, '')  AS garment_2_back_image_url,
-			COALESCE(b.garment_2_left_image_url, '')  AS garment_2_left_image_url,
-			COALESCE(b.garment_2_right_image_url, '') AS garment_2_right_image_url,
-			COALESCE(b.garment_3_front_image_url, '') AS garment_3_front_image_url,
-			COALESCE(b.garment_3_back_image_url, '')  AS garment_3_back_image_url,
-			COALESCE(b.garment_3_left_image_url, '')  AS garment_3_left_image_url,
-			COALESCE(b.garment_3_right_image_url, '') AS garment_3_right_image_url,
-			COALESCE(b.story_line_1, '') AS story_line_1,
-			COALESCE(b.story_line_2, '') AS story_line_2,
-			COALESCE(b.story_line_3, '') AS story_line_3
+			COALESCE(b.phone, '')     AS phone
 		FROM brands b
 		LEFT JOIN users u    ON u.id = b.user_id
 		LEFT JOIN products p ON p.brand_id = b.id
@@ -173,11 +135,7 @@ func GetPublicBrandBySlug(c *gin.Context) {
 			b.logo_url, b.banner_url, b.website, b.category,
 			b.verification_status, b.subscription_plan, b.subscription_status,
 			u.city, u.state_name, u.country_name,
-			b.instagram, b.facebook, b.twitter, b.tik_tok, b.phone,
-			b.garment_1_front_image_url, b.garment_1_back_image_url, b.garment_1_left_image_url, b.garment_1_right_image_url,
-			b.garment_2_front_image_url, b.garment_2_back_image_url, b.garment_2_left_image_url, b.garment_2_right_image_url,
-			b.garment_3_front_image_url, b.garment_3_back_image_url, b.garment_3_left_image_url, b.garment_3_right_image_url,
-			b.story_line_1, b.story_line_2, b.story_line_3
+			b.instagram, b.facebook, b.twitter, b.tik_tok, b.phone
 	`, slug).Scan(&brand).Error
 
 	if err != nil || brand.ID == 0 {

@@ -8,26 +8,6 @@ import {
 import ImageUpload from "../../../../components/ImageUpload";
 import PhoneInput from "../../../../components/phoneinput";
 import { useGeo } from "../../../../utils/geo";
-import { DEFAULT_STORY_LINES } from "../../../Brands/brand_components/storyDefaults";
-
-const GARMENT_KEYS = [1, 2, 3].flatMap((n) => [
-  `garment_${n}_front_image_url`,
-  `garment_${n}_back_image_url`,
-  `garment_${n}_left_image_url`,
-  `garment_${n}_right_image_url`,
-]);
-
-const GARMENTS = [1, 2, 3].map((n) => ({
-  index: n,
-  storyKey: `story_line_${n}`,
-  storyPlaceholder: DEFAULT_STORY_LINES[n - 1],
-  angles: [
-    {key: `garment_${n}_front_image_url`, label: n === 1 ? "Front (required)" : "Front"},
-    {key: `garment_${n}_back_image_url`, label: "Back"},
-    {key: `garment_${n}_left_image_url`, label: "Left Side"},
-    {key: `garment_${n}_right_image_url`, label: "Right Side"},
-  ],
-}));
 
 const BASE = "https://blvckmrktng.com/api";
 function token() {
@@ -136,10 +116,6 @@ export default function Settings({onBrandUpdate}) {
     description:  "",
     logo_url:     "",
     banner_url:   "",
-    ...Object.fromEntries(GARMENT_KEYS.map((k) => [k, ""])),
-    story_line_1: "",
-    story_line_2: "",
-    story_line_3: "",
     website:      "",
     instagram:    "",
     facebook:     "",
@@ -170,10 +146,6 @@ export default function Settings({onBrandUpdate}) {
           description:  p.description  || "",
           logo_url:     p.logo_url     || "",
           banner_url:   p.banner_url   || "",
-          ...Object.fromEntries(GARMENT_KEYS.map((k) => [k, p[k] || ""])),
-          story_line_1: p.story_line_1 || "",
-          story_line_2: p.story_line_2 || "",
-          story_line_3: p.story_line_3 || "",
           website:      p.website      || "",
           instagram:    p.instagram    || "",
           facebook:     p.facebook     || "",
@@ -220,10 +192,6 @@ export default function Settings({onBrandUpdate}) {
         description:  form.description,
         logo_url:     form.logo_url,
         banner_url:   form.banner_url,
-        ...Object.fromEntries(GARMENT_KEYS.map((k) => [k, form[k]])),
-        story_line_1: form.story_line_1,
-        story_line_2: form.story_line_2,
-        story_line_3: form.story_line_3,
         website:      form.website,
         phone:        form.phone,
         // Location
@@ -253,10 +221,6 @@ export default function Settings({onBrandUpdate}) {
           description:  updated.description   ?? prev.description,
           logo_url:     updated.logo_url       ?? prev.logo_url,
           banner_url:   updated.banner_url     ?? prev.banner_url,
-          ...Object.fromEntries(GARMENT_KEYS.map((k) => [k, updated[k] ?? prev[k]])),
-          story_line_1: updated.story_line_1 ?? prev.story_line_1,
-          story_line_2: updated.story_line_2 ?? prev.story_line_2,
-          story_line_3: updated.story_line_3 ?? prev.story_line_3,
           website:      updated.website        ?? prev.website,
           instagram:    updated.instagram      ?? prev.instagram,
           facebook:     updated.facebook       ?? prev.facebook,
@@ -365,10 +329,8 @@ export default function Settings({onBrandUpdate}) {
         .bs-top-row{display:grid;grid-template-columns:1fr 340px;gap:16px;align-items:start;margin-bottom:16px;}
         .bs-name-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;}
         .bs-2col{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-        .bs-4col{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
         @media(max-width:860px){.bs-top-row{grid-template-columns:1fr!important;}}
         .bs-steplabel{display:inline;}
-        @media(max-width:640px){.bs-4col{grid-template-columns:1fr 1fr!important;}}
         @media(max-width:520px){.bs-name-row,.bs-2col{grid-template-columns:1fr!important;}.bs-steplabel{display:none!important;}}
         select option { background: #111 !important; color: #fff !important; }
         select option:checked { background: #ef4444 !important; color: #fff !important; }
@@ -490,58 +452,6 @@ export default function Settings({onBrandUpdate}) {
                   Wide banner for your storefront header. Recommended: 1200×400px.
                 </p>
               </div>
-            </div>
-
-            {/* Garment Showcase */}
-            <div style={{marginBottom: 14}}>
-              <Label c="Garment Showcase" />
-              <p style={{color: "rgba(255,255,255,0.25)", fontSize: 11, lineHeight: 1.6, margin: "0 0 14px"}}>
-                Upload up to 3 garments as an animated, spinnable showcase on your storefront, replacing
-                the plain banner above. Each garment needs at least a front photo — back/left/right are
-                optional and unlock a 360° spin when present. Garment 1's front photo is required for the
-                showcase to appear at all.
-              </p>
-              {GARMENTS.map(({index, angles, storyKey, storyPlaceholder}) => (
-                <div
-                  key={index}
-                  style={{
-                    marginBottom: 18, paddingBottom: 16,
-                    borderBottom: index < 3 ? "1px solid rgba(255,255,255,0.06)" : "none",
-                  }}>
-                  <p style={{color: "rgba(255,255,255,0.4)", fontSize: 10, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", margin: "0 0 10px"}}>
-                    Garment {index}
-                    {index > 1 && (
-                      <span style={{color: "rgba(255,255,255,0.2)", fontWeight: 400, textTransform: "none", letterSpacing: 0}}>
-                        {" "}— optional
-                      </span>
-                    )}
-                  </p>
-                  <div className="bs-4col" style={{marginBottom: 10}}>
-                    {angles.map(({key, label}) => (
-                      <div key={key}>
-                        <div style={{marginBottom: 6, borderRadius: 10, overflow: "hidden", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", height: 70, position: "relative", display: "flex", alignItems: "center", justifyContent: "center"}}>
-                          {form[key] ? (
-                            <img src={form[key]} alt={label} style={{width: "100%", height: "100%", objectFit: "cover"}} />
-                          ) : (
-                            <p style={{color: "rgba(255,255,255,0.2)", fontSize: 9, margin: 0, textAlign: "center", padding: "0 6px"}}>
-                              {label}
-                            </p>
-                          )}
-                        </div>
-                        <ImageUpload
-                          folder="brand-hero"
-                          shape="square"
-                          label="Upload"
-                          preview={form[key]}
-                          onUpload={(url) => setForm((f) => ({...f, [key]: url}))}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                  <Label c={`Story Line ${index} (optional)`} />
-                  <input value={form[storyKey]} onChange={set(storyKey)} placeholder={storyPlaceholder} style={inp} onFocus={onF} onBlur={onB} />
-                </div>
-              ))}
             </div>
 
             <div style={{marginBottom: 10}}>
