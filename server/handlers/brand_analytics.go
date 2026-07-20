@@ -312,12 +312,21 @@ func BrandOverview(c *gin.Context) {
 	database.DB.Model(&models.BrandBankAccount{}).Where("brand_id = ?", brand.ID).Count(&bankAccountCount)
 
 	onboarding := gin.H{
-		"has_shipping":        hasShipping,
-		"has_bank_account":    bankAccountCount > 0,
-		"has_logo":            brand.LogoURL != "",
-		"has_products":        productCount > 0,
-		"partnership_signed":  brand.PartnershipSigned,
-		"complete":            hasShipping && bankAccountCount > 0 && brand.LogoURL != "" && productCount > 0 && brand.PartnershipSigned,
+		"has_shipping":       hasShipping,
+		"has_bank_account":   bankAccountCount > 0,
+		"has_logo":           brand.LogoURL != "",
+		"has_products":       productCount > 0,
+		"partnership_signed": brand.PartnershipSigned,
+		"complete":           hasShipping && bankAccountCount > 0 && brand.LogoURL != "" && productCount > 0 && brand.PartnershipSigned,
+
+		// Split out separately from has_shipping: a pickup location is
+		// required regardless of delivery mode (Dellyman needs a collection
+		// address; buyer self-pickup needs one too), and a brand can satisfy
+		// has_shipping via pickup alone while still never having configured
+		// their own delivery plan (zones/local rates) — the two need
+		// independent nudges on the dashboard.
+		"has_pickup":        pickupCount > 0,
+		"has_delivery_plan": shippingMethodCount > 0 || localRateCount > 0,
 	}
 
 	// ──────────────────────────────────────────────────────────────────────────

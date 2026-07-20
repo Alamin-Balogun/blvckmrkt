@@ -113,6 +113,67 @@ function OnboardingChecklist({onboarding, onNav}) {
   );
 }
 
+const deliveryBannerBtnStyle = {
+  display: "flex", alignItems: "center", gap: 10, width: "100%",
+  background: "rgba(249,115,22,0.06)",
+  border: "1px solid rgba(249,115,22,0.25)",
+  borderRadius: 10, padding: "12px 14px", cursor: "pointer",
+};
+const deliveryBannerDotStyle = {
+  width: 16, height: 16, borderRadius: "50%", flexShrink: 0,
+  border: "2px solid #f97316",
+};
+
+// Pickup + delivery-plan reminders — independent of the general onboarding
+// checklist above, whose "has_shipping" is satisfied by pickup OR zones OR
+// local rates (any one). A pickup location is required no matter which
+// delivery mode the platform is in (Dellyman needs a collection address;
+// buyer self-pickup needs one too), so it gets its own always-on nudge here
+// even after the general checklist reports "complete".
+function DeliverySetupBanner({onboarding, deliveryMode, onNav}) {
+  if (!onboarding) return null;
+
+  const needsPickup = !onboarding.has_pickup;
+  const needsDeliveryPlan = deliveryMode !== "dellyman" && !onboarding.has_delivery_plan;
+
+  if (!needsPickup && !needsDeliveryPlan) return null;
+
+  return (
+    <div style={{display: "flex", flexDirection: "column", gap: 10, marginBottom: 20}}>
+      {needsPickup && (
+        <button onClick={() => onNav?.("local_shipping")} style={deliveryBannerBtnStyle}>
+          <span style={deliveryBannerDotStyle} />
+          <span style={{flex: 1, minWidth: 0, textAlign: "left"}}>
+            <span style={{display: "block", color: "#fff", fontSize: 12, fontWeight: 700}}>
+              You haven't set up a pickup location yet
+            </span>
+            <span style={{display: "block", color: "rgba(255,255,255,0.4)", fontSize: 10.5, marginTop: 2}}>
+              Required so couriers know where to collect orders — buyers who want to pick up in
+              person need one too.
+            </span>
+          </span>
+          <span style={{color: "rgba(255,255,255,0.3)", fontSize: 11}}>→</span>
+        </button>
+      )}
+      {needsDeliveryPlan && (
+        <button onClick={() => onNav?.("shipping")} style={deliveryBannerBtnStyle}>
+          <span style={deliveryBannerDotStyle} />
+          <span style={{flex: 1, minWidth: 0, textAlign: "left"}}>
+            <span style={{display: "block", color: "#fff", fontSize: 12, fontWeight: 700}}>
+              You haven't set up your delivery plan yet
+            </span>
+            <span style={{display: "block", color: "rgba(255,255,255,0.4)", fontSize: 10.5, marginTop: 2}}>
+              You're handling your own delivery — add at least one shipping zone or local rate so
+              buyers can check out.
+            </span>
+          </span>
+          <span style={{color: "rgba(255,255,255,0.3)", fontSize: 11}}>→</span>
+        </button>
+      )}
+    </div>
+  );
+}
+
 function Badge({status}) {
   const s = STATUS_MAP[status] || {
     color: "#fff",
@@ -365,6 +426,14 @@ export default function Overview({onNav}) {
       <MaintenanceBanner />
 
       {!loading && <OnboardingChecklist onboarding={onboarding} onNav={onNav} />}
+
+      {!loading && (
+        <DeliverySetupBanner
+          onboarding={onboarding}
+          deliveryMode={settings.delivery_mode}
+          onNav={onNav}
+        />
+      )}
 
       {/* Purchases paused banner */}
       {settings.disable_purchases && (
