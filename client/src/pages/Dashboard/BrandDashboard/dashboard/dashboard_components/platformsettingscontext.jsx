@@ -25,6 +25,7 @@ const DEFAULTS = {
   commission_rate: 10,
   maintenance_mode: false,
   maintenance_message: "We're updating the platform. Back soon.",
+  delivery_mode: "brand",
 };
 
 // ── Module-level settings cache with 3-minute TTL ────────────────────────────

@@ -8,6 +8,7 @@ import (
 
 	"github.com/Alamin-Balogun/blvckmrkt/database"
 	"github.com/Alamin-Balogun/blvckmrkt/models"
+	"github.com/Alamin-Balogun/blvckmrkt/services"
 	"github.com/Alamin-Balogun/blvckmrkt/utils"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm/clause"
@@ -113,6 +114,11 @@ func AdminGetSettings(c *gin.Context) {
 			settings[r.Key] = r.Value
 		}
 	}
+
+	// Not a persisted setting — reflects whether DELLYMAN_API_KEY is set on
+	// the server, so the admin UI can warn before switching delivery_mode to
+	// "dellyman" with no credentials configured.
+	settings["dellyman_configured"] = services.DellymanConfigured()
 
 	utils.OK(c, "Settings fetched", gin.H{"settings": settings})
 }

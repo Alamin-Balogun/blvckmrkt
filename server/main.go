@@ -79,6 +79,7 @@ func main() {
 		&models.OrderPickup{},
 		&models.OrderZoneDelivery{},
 		&models.OrderLocalDelivery{},
+		&models.OrderDellymanDelivery{},
 		
 		// ✅ ORDER PAYMENT DETAILS
 		&models.OrderPaymentTransfer{},

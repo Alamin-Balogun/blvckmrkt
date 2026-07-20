@@ -21,6 +21,7 @@ var allowedBrandSettings = map[string]bool{
 	"commission_rate":     true,
 	"maintenance_mode":    true,
 	"maintenance_message": true,
+	"delivery_mode":       true,
 }
 
 var brandSettingDefaults = map[string]interface{}{
@@ -35,6 +36,7 @@ var brandSettingDefaults = map[string]interface{}{
 	"commission_rate":     10,
 	"maintenance_mode":    false,
 	"maintenance_message": "We're updating the platform. Back soon.",
+	"delivery_mode":       "brand",
 }
 
 // GET /api/brand/platform-settings

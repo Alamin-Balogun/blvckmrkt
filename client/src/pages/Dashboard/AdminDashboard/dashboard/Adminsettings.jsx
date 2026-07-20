@@ -442,11 +442,13 @@ const DEFAULTS = {
   read_only_mode: false,
   disable_new_signups: false,
   disable_purchases: false,
+  delivery_mode: "brand",
 };
 
 const TABS = [
   {id: "general", label: "General"},
   {id: "commerce", label: "Commerce"},
+  {id: "delivery", label: "Delivery"},
   {id: "auth", label: "Auth & Security"},
   {id: "email", label: "Email"},
   {id: "maintenance", label: "Maintenance"},
@@ -460,6 +462,7 @@ export default function AdminSettings() {
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [dellymanConfigured, setDellymanConfigured] = useState(false);
 
   // Danger zone loading states
   const [dLoading, setDLoading] = useState({sessions: false, cache: false, export: false});
@@ -468,7 +471,11 @@ export default function AdminSettings() {
     getSettings()
       .then((d) => {
         const raw = d?.settings ?? d ?? {};
-        setValues({...DEFAULTS, ...raw});
+        // dellyman_configured reflects a server env var, not a real setting —
+        // keep it out of `values` so it never gets written back on save.
+        const {dellyman_configured, ...rest} = raw;
+        setDellymanConfigured(!!dellyman_configured);
+        setValues({...DEFAULTS, ...rest});
       })
       .catch((e) => setError(e.message || "Failed to load settings"))
       .finally(() => setLoading(false));
@@ -623,6 +630,50 @@ export default function AdminSettings() {
           <Row label="Auto-approve Reviews" desc="Skip moderation and publish reviews instantly">
             <Toggle value={!!values.auto_approve_reviews} onChange={set("auto_approve_reviews")} />
           </Row>
+        </Section>
+      </>
+    ),
+    delivery: (
+      <>
+        <Section
+          title="Delivery Fulfillment"
+          desc="Choose who's responsible for getting orders to buyers, platform-wide">
+          <Row
+            label="Delivery Mode"
+            desc="Brand-handled: each brand manages its own shipping zones/rates. Dellyman: BLVCKMRKT books and tracks every delivery through the Dellyman courier API.">
+            <SettingSelect
+              value={values.delivery_mode}
+              onChange={set("delivery_mode")}
+              options={[
+                ["brand", "Brand-handled"],
+                ["dellyman", "Platform (Dellyman)"],
+              ]}
+            />
+          </Row>
+          {values.delivery_mode === "dellyman" && !dellymanConfigured && (
+            <div
+              style={{
+                background: "rgba(249,115,22,0.08)",
+                border: "1px solid rgba(249,115,22,0.2)",
+                borderRadius: 10,
+                padding: "11px 14px",
+              }}>
+              <p style={{color: "#f97316", fontSize: 11.5, fontWeight: 700, margin: 0, lineHeight: 1.6}}>
+                Dellyman API credentials aren't configured on the server yet (DELLYMAN_API_KEY).
+                Bookings will fail until they're added — ask an engineer to set them before relying
+                on this mode in production.
+              </p>
+            </div>
+          )}
+        </Section>
+        <Section
+          title="Pickup Locations"
+          desc="Applies regardless of delivery mode">
+          <p style={{color: "rgba(255,255,255,0.4)", fontSize: 12, lineHeight: 1.7, margin: 0}}>
+            Every brand still needs at least one pickup location on file — Dellyman needs a
+            collection address, and buyers who choose in-person pickup need one too. Brands without
+            one see a reminder on their dashboard overview to set it up.
+          </p>
         </Section>
       </>
     ),

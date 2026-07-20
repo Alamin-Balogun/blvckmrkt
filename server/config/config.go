@@ -23,6 +23,13 @@ type Config struct {
 	ResendAPIKey  string // from Resend dashboard → API Keys
 	EmailFrom     string // e.g. onboarding@resend.dev (dev) or noreply@blvckmrkt.com (prod)
 	EmailFromName string // display name shown in inbox e.g. "BLVCKMRKT"
+
+	// Dellyman — third-party delivery courier (https://dellyman.com/rest-api/)
+	// DellymanBaseURL defaults to their sandbox; switch to the live API base
+	// once DELLYMAN_API_KEY holds a production key.
+	DellymanAPIKey        string
+	DellymanBaseURL       string
+	DellymanWebhookSecret string
 }
 
 var App *Config
@@ -51,6 +58,10 @@ func Load() {
 		ResendAPIKey:  getEnv("RESEND_API_KEY", "re_M896jNBj_9xA7j4MzZBTxkDjaFa2EvV6E"),
 		EmailFrom:     getEnv("EMAIL_FROM", "onboarding@resend.dev"),
 		EmailFromName: getEnv("EMAIL_FROM_NAME", "BLVCKMRKT"),
+
+		DellymanAPIKey:        getEnv("DELLYMAN_API_KEY", ""),
+		DellymanBaseURL:       getEnv("DELLYMAN_BASE_URL", "https://dev.dellyman.com/api/v3.0"),
+		DellymanWebhookSecret: getEnv("DELLYMAN_WEBHOOK_SECRET", ""),
 	}
 
 	log.Printf("[config] loaded — env=%s port=%s db=%s@%s/%s",
