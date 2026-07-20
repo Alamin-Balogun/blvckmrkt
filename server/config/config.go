@@ -30,6 +30,12 @@ type Config struct {
 	DellymanAPIKey        string
 	DellymanBaseURL       string
 	DellymanWebhookSecret string
+	// Defaults used on every GetQuotes/BookOrder call until we have a UI for
+	// picking a vehicle/payment mode per booking. Adjustable via env without
+	// a code change once real Dellyman docs/credentials confirm valid values.
+	DellymanDefaultVehicle     string
+	DellymanDefaultPaymentMode string
+	DellymanPickupWindow       string
 }
 
 var App *Config
@@ -62,6 +68,10 @@ func Load() {
 		DellymanAPIKey:        getEnv("DELLYMAN_API_KEY", ""),
 		DellymanBaseURL:       getEnv("DELLYMAN_BASE_URL", "https://dev.dellyman.com/api/v3.0"),
 		DellymanWebhookSecret: getEnv("DELLYMAN_WEBHOOK_SECRET", ""),
+
+		DellymanDefaultVehicle:     getEnv("DELLYMAN_DEFAULT_VEHICLE", "Bike"),
+		DellymanDefaultPaymentMode: getEnv("DELLYMAN_DEFAULT_PAYMENT_MODE", "Wallet"),
+		DellymanPickupWindow:       getEnv("DELLYMAN_PICKUP_WINDOW", "09:00 AM to 06:00 PM"),
 	}
 
 	log.Printf("[config] loaded — env=%s port=%s db=%s@%s/%s",

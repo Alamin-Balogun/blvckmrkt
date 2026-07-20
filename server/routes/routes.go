@@ -19,6 +19,11 @@ func Register(r *gin.Engine) {
 	// ── Webhooks ───────────────────────────────────────────────
         api.POST("/paystack/webhook", handlers.PaystackWebhook)
         api.POST("/flutterwave/webhook", handlers.FlutterwaveWebhook)
+        api.POST("/webhooks/dellyman", handlers.DellymanWebhook)
+
+	// ── Checkout delivery pricing (public — guest checkout needs it too) ───────
+	api.GET("/checkout/delivery-mode", handlers.CheckoutDeliveryMode)
+	api.POST("/checkout/dellyman-quote", middleware.RateLimit(60, time.Minute), handlers.CheckoutDellymanQuote)
 
 	// ── Site visit tracking (public, fire-and-forget beacon) ───────────────────
 	api.POST("/track/visit", middleware.RateLimit(120, time.Minute), handlers.TrackVisit)

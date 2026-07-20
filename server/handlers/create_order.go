@@ -637,6 +637,31 @@ func buildOrder(
 			})
 		}
 
+		// ✅ Dellyman live quotes — only when the platform-wide delivery mode
+		// is set to Dellyman and the buyer chose courier delivery (not
+		// self-pickup). Runs before totals so the authoritative,
+		// freshly-quoted price (not whatever the client submitted, which
+		// could be stale or tampered with) is what gets charged.
+		var dellymanQuotes map[uint]dellymanQuote
+		var dellymanBrandOrder []uint
+		if req.DeliveryMode == "delivery" && req.Delivery != nil && dellymanDeliveryModeEnabled() {
+			brandTotals := map[uint]float64{}
+			for _, it := range orderItems {
+				if _, seen := brandTotals[it.BrandID]; !seen {
+					dellymanBrandOrder = append(dellymanBrandOrder, it.BrandID)
+				}
+				brandTotals[it.BrandID] += it.TotalPrice
+			}
+
+			deliveryAddress := formatDellymanAddress(req.Delivery.Address, req.Delivery.City, req.Delivery.State, req.Delivery.Country)
+			quotes, total, err := quoteDellymanForBrands(tx, brandTotals, dellymanBrandOrder, deliveryAddress)
+			if err != nil {
+				return err
+			}
+			dellymanQuotes = quotes
+			req.ShippingCost = total
+		}
+
 		// Totals
 		shippingFee := req.ShippingCost
 		if shippingFee < 0 {
@@ -676,6 +701,8 @@ func buildOrder(
 		var deliveryType models.DeliveryType
 		if req.DeliveryMode == "pickup" {
 			deliveryType = models.DeliveryPickup
+		} else if dellymanQuotes != nil {
+			deliveryType = models.DeliveryDellyman
 		} else if req.Delivery != nil {
 			if req.Delivery.ShippingMethodID != nil {
 				deliveryType = models.DeliveryZone
@@ -745,6 +772,14 @@ func buildOrder(
 				return fmt.Errorf("failed to create pickup details: %w", err)
 			}
 			log.Printf("✅ Pickup details created for order %s", order.DisplayID)
+
+		} else if req.DeliveryMode == "delivery" && req.Delivery != nil && dellymanQuotes != nil {
+			contactName := strings.TrimSpace(req.Delivery.FirstName + " " + req.Delivery.LastName)
+			deliveryAddress := formatDellymanAddress(req.Delivery.Address, req.Delivery.City, req.Delivery.State, req.Delivery.Country)
+			if err := createDellymanDeliveryRows(tx, order.ID, dellymanQuotes, dellymanBrandOrder, deliveryAddress, req.Delivery.Apt, contactName, req.Contact.Phone); err != nil {
+				return err
+			}
+			log.Printf("✅ Dellyman delivery details created for order %s (%d brand(s))", order.DisplayID, len(dellymanBrandOrder))
 
 		} else if req.DeliveryMode == "delivery" && req.Delivery != nil {
 
@@ -856,5 +891,14 @@ func buildOrder(
 	if txErr != nil {
 		return models.Order{}, txErr
 	}
+
+	// Book the actual courier pickup only once payment is confirmed — never
+	// commit a real booking against an unpaid/pending order. Covers every
+	// caller of buildOrder (synchronous card checkout, guest checkout, and
+	// the hosted-gateway finalize paths) from this single choke point.
+	if order.DeliveryType == models.DeliveryDellyman && paymentStatus == "paid" {
+		go bookDellymanShipmentsForOrder(order)
+	}
+
 	return order, nil
 }

@@ -317,13 +317,25 @@ function SearchSelect({options, value, onChange, placeholder, disabled}) {
   );
 }
 
+// Placeholder shown instead of a brand's own zones/local rates once the
+// platform is handling delivery itself via Dellyman — the real price comes
+// from a live courier quote (see the dellymanQuote effect below), fetched
+// once the buyer's address is known.
+const DELLYMAN_DELIVERY_METHOD = {
+  id: "dellyman",
+  type: "dellyman",
+  name: "Courier delivery",
+  description: "Priced live based on your delivery address.",
+  flat_rate: 0,
+};
+
 // ── CheckoutBrandShippingPanel ────────────────────────────────────────────────
 // Inline shipping method selector for the checkout Delivery step (cart flow).
 // Fetches the brand's shipping options once, caches them, and lets the user
 // change the selected method — supports both delivery and pickup tabs.
 function CheckoutBrandShippingPanel({
   brandId, brandName, selected, cache, setCache,
-  fmtMoney, convert, baseCurrency, onSelect,
+  fmtMoney, convert, baseCurrency, onSelect, dellymanMode,
 }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -360,20 +372,25 @@ function CheckoutBrandShippingPanel({
     setTab(selected?.pickupMode ? "pickup" : "delivery");
   }, [selected?.pickupMode]);
 
-  const deliveryMethods = shippingData ? [
-    ...(shippingData.zones?.flatMap((z) =>
-      (z.methods ?? []).map((m) => ({
-        ...m, type: "zone",
-        locations: z.locations ?? [],
-        zone: z,
-      }))
-    ) ?? []),
-    ...(shippingData.local?.map((m) => ({
-      ...m,
-      type: "local",
-      _currency: (m.currency_code || m.currency || baseCurrency || "NGN").toUpperCase(),
-    })) ?? []),
-  ] : [];
+  // While the platform handles delivery via Dellyman, a brand's own
+  // zones/local rates don't apply — only the live-priced courier option
+  // does. Pickup is unaffected: it stays brand-handled either way.
+  const deliveryMethods = dellymanMode
+    ? [DELLYMAN_DELIVERY_METHOD]
+    : shippingData ? [
+        ...(shippingData.zones?.flatMap((z) =>
+          (z.methods ?? []).map((m) => ({
+            ...m, type: "zone",
+            locations: z.locations ?? [],
+            zone: z,
+          }))
+        ) ?? []),
+        ...(shippingData.local?.map((m) => ({
+          ...m,
+          type: "local",
+          _currency: (m.currency_code || m.currency || baseCurrency || "NGN").toUpperCase(),
+        })) ?? []),
+      ] : [];
 
   const pickupMethods = shippingData?.pickups ?? [];
   const hasDelivery = deliveryMethods.length > 0;
@@ -608,6 +625,12 @@ function CheckoutBrandShippingPanel({
                     )}
 
                     {/* ✅ PICKUP LOCATIONS */}
+                    {(tab === "pickup" || !hasDelivery) && !hasPickup && (
+                      <p style={{color: "rgba(255,193,7,0.7)", fontSize: 11, textAlign: "center", padding: "10px 0", margin: 0}}>
+                        {brandName || "This brand"} hasn't set up a pickup location yet
+                        {hasDelivery ? " — please choose delivery instead." : "."}
+                      </p>
+                    )}
                     {(tab === "pickup" || !hasDelivery) && hasPickup && (
                       <>
                         {pickupMethods.map((loc) => {
@@ -720,6 +743,14 @@ export default function CheckoutForm() {
   });
   const [selectedShippingMethod, setSelectedShippingMethod] = useState(null);
   const [selectedPickupLocation, setSelectedPickupLocation] = useState(null);
+
+  // Platform-wide toggle (admin setting): "dellyman" means the platform
+  // handles delivery itself via courier instead of each brand's own
+  // zones/local rates. Pickup is unaffected either way.
+  const [dellymanMode, setDellymanMode] = useState(false);
+  // Live courier price for the whole cart, fetched once the buyer's
+  // delivery address is known — see the effect below.
+  const [dellymanQuote, setDellymanQuote] = useState({loading: false, error: "", total: 0, breakdown: []});
 
   // ── Form state ────────────────────────────────────────────────────────────
   const [step, setStep] = useState(0);
@@ -1029,6 +1060,47 @@ const cityOptions = useMemo(() => {
     setCartLoading(false);
   }, [cartItems]); // eslint-disable-line
 
+  // ── Platform delivery mode ────────────────────────────────────────────────
+  useEffect(() => {
+    fetch(`${API_BASE}/api/checkout/delivery-mode`)
+      .then((r) => r.json())
+      .then((json) => setDellymanMode((json?.data ?? json)?.delivery_mode === "dellyman"))
+      .catch(() => setDellymanMode(false));
+  }, []);
+
+  // ── Live Dellyman quote ────────────────────────────────────────────────────
+  // Fetches once the buyer's delivery address is filled in enough to price a
+  // courier trip. Re-fetches (debounced) whenever the address or cart
+  // contents change while this mode is active.
+  useEffect(() => {
+    if (!dellymanMode || deliveryMode !== "delivery" || items.length === 0) return;
+    if (!delivery.city.trim() || !delivery.country_name) return;
+
+    const timer = setTimeout(() => {
+      setDellymanQuote((prev) => ({...prev, loading: true, error: ""}));
+      fetch(`${API_BASE}/api/checkout/dellyman-quote`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          items: items.map((i) => ({product_id: i.productId, quantity: i.qty})),
+          address: delivery.address,
+          city: delivery.city,
+          state: delivery.state_name,
+          country: delivery.country_name,
+        }),
+      })
+        .then(async (r) => {
+          const json = await r.json().catch(() => ({}));
+          if (!r.ok) throw new Error(json?.message || "Couldn't price delivery for this address");
+          return json?.data ?? json;
+        })
+        .then((data) => setDellymanQuote({loading: false, error: "", total: Number(data?.total || 0), breakdown: data?.breakdown || []}))
+        .catch((err) => setDellymanQuote({loading: false, error: err.message || "Couldn't price delivery for this address", total: 0, breakdown: []}));
+    }, 600);
+
+    return () => clearTimeout(timer);
+  }, [dellymanMode, deliveryMode, items, delivery.address, delivery.city, delivery.state_name, delivery.country_name]);
+
   // ── Fetch shipping data ───────────────────────────────────────────────────
   useEffect(() => {
     // Cart flow: shipping already selected per-brand in cartgrid.
@@ -1078,6 +1150,7 @@ const cityOptions = useMemo(() => {
 
   const deliveryCost = useMemo(() => {
     if (deliveryMode !== "delivery") return 0;
+    if (dellymanMode) return dellymanQuote.total;
     // Cart flow: sum up all non-pickup methods from the live (mutable) brandShippingMap
     if (passedBrandShippingMap) {
       const total = Object.values(brandShippingMap).reduce((s, m) => {
@@ -1102,7 +1175,7 @@ const cityOptions = useMemo(() => {
       baseCurrency
     ).toUpperCase();
     return convert(rawPrice, fromCurrency);
-  }, [selectedShippingMethod, deliveryMode, convert, baseCurrency, brandShippingMap, passedBrandShippingMap]);
+  }, [selectedShippingMethod, deliveryMode, convert, baseCurrency, brandShippingMap, passedBrandShippingMap, dellymanMode, dellymanQuote.total]);
 
   const orderTotal = Math.max(0, subtotal - discount + deliveryCost + tax);
 
@@ -1185,8 +1258,13 @@ const cityOptions = useMemo(() => {
         if (!delivery.address.trim()) e.address = "Required";
         if (!delivery.city.trim()) e.city = "Required";
         if (!delivery.zip.trim()) e.zip = "Required";
-        // Cart orders have shipping pre-selected per-brand; skip this check
-        if (!passedBrandShippingMap && !selectedShippingMethod) e.shipping = "Please select a shipping method";
+        if (dellymanMode) {
+          if (dellymanQuote.error) e.shipping = dellymanQuote.error;
+          else if (dellymanQuote.loading) e.shipping = "Still pricing delivery for your address — one moment";
+        } else if (!passedBrandShippingMap && !selectedShippingMethod) {
+          // Cart orders have shipping pre-selected per-brand; skip this check
+          e.shipping = "Please select a shipping method";
+        }
       } else {
         // ✅ Cart flow: check brandShippingMap has at least one pickup selected
         if (passedBrandShippingMap) {
@@ -2290,6 +2368,7 @@ if (!delivery.country_code && geoLoaded) {
                               fmtMoney={fmtMoney}
                               convert={convert}
                               baseCurrency={baseCurrency}
+                              dellymanMode={dellymanMode}
                               onSelect={(method) => {
                                 setBrandShippingMap((prev) => ({
                                   ...prev,
@@ -2309,6 +2388,30 @@ if (!delivery.country_code && geoLoaded) {
                         </div>
                       ) : (
                         /* ── BUY NOW FLOW: existing shipping method selector ── */
+                        <>
+                      {dellymanMode ? (
+                        <div style={{
+                          padding: "14px 16px", borderRadius: 10,
+                          background: "rgba(239,68,68,0.05)", border: "1px solid rgba(239,68,68,0.2)",
+                        }}>
+                          <p style={{color: "#fff", fontSize: 12, fontWeight: 700, margin: "0 0 4px"}}>
+                            🚚 Courier delivery
+                          </p>
+                          {dellymanQuote.loading ? (
+                            <p style={{color: "rgba(255,255,255,0.4)", fontSize: 11, margin: 0}}>Pricing delivery for your address…</p>
+                          ) : dellymanQuote.error ? (
+                            <p style={{color: "#ef4444", fontSize: 11, margin: 0}}>{dellymanQuote.error}</p>
+                          ) : delivery.city.trim() && delivery.country_name ? (
+                            <p style={{color: "rgba(255,255,255,0.5)", fontSize: 11, margin: 0}}>
+                              {fmtMoney(convert(dellymanQuote.total, baseCurrency))} to {[delivery.city, delivery.state_name].filter(Boolean).join(", ")}
+                            </p>
+                          ) : (
+                            <p style={{color: "rgba(255,255,255,0.4)", fontSize: 11, margin: 0}}>
+                              Priced live once your address below is filled in.
+                            </p>
+                          )}
+                        </div>
+                      ) : (
                         <>
                       {!delivery.country_code &&
                         !delivery.state_name &&
@@ -2554,6 +2657,8 @@ if (!delivery.country_code && geoLoaded) {
                           })}
                         </>
                       )}
+                      </>
+                      )}
                       {errors.shipping && (
                         <span className="co-error">{errors.shipping}</span>
                       )}
@@ -2578,6 +2683,7 @@ if (!delivery.country_code && geoLoaded) {
                               fmtMoney={fmtMoney}
                               convert={convert}
                               baseCurrency={baseCurrency}
+                              dellymanMode={dellymanMode}
                               onSelect={(method) => {
                                 setBrandShippingMap((prev) => ({
                                   ...prev,

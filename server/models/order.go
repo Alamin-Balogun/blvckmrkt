@@ -28,9 +28,10 @@ const (
 	PaymentFailed   PaymentStatus = "failed"
 	PaymentRefunded PaymentStatus = "refunded"
 
-	DeliveryPickup DeliveryType = "pickup"
-	DeliveryZone   DeliveryType = "zone"
-	DeliveryLocal  DeliveryType = "local"
+	DeliveryPickup   DeliveryType = "pickup"
+	DeliveryZone     DeliveryType = "zone"
+	DeliveryLocal    DeliveryType = "local"
+	DeliveryDellyman DeliveryType = "dellyman"
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -69,11 +70,15 @@ type Order struct {
 	UpdatedAt     time.Time      `                                              json:"updated_at"`
 	DeletedAt     gorm.DeletedAt `gorm:"index"                                  json:"-"`
 
-	// ✅ Relationships - only ONE will be populated based on DeliveryType
+	// ✅ Relationships - only ONE of Pickup/Zone/Local/Dellyman will be
+	// populated based on DeliveryType, except DellymanDeliveries which can
+	// hold multiple rows — one per brand in the order, since each brand
+	// ships from its own pickup location.
 	Items              []OrderItem             `gorm:"foreignKey:OrderID" json:"items,omitempty"`
 	PickupDetails      *OrderPickup            `gorm:"foreignKey:OrderID" json:"pickup_details,omitempty"`
 	ZoneDelivery       *OrderZoneDelivery      `gorm:"foreignKey:OrderID" json:"zone_delivery,omitempty"`
 	LocalDelivery      *OrderLocalDelivery     `gorm:"foreignKey:OrderID" json:"local_delivery,omitempty"`
+	DellymanDeliveries []OrderDellymanDelivery `gorm:"foreignKey:OrderID" json:"dellyman_deliveries,omitempty"`
 	PaymentTransfer    *OrderPaymentTransfer   `gorm:"foreignKey:OrderID" json:"payment_transfer,omitempty"`
 	PaymentGateway     *OrderPaymentGateway    `gorm:"foreignKey:OrderID" json:"payment_gateway,omitempty"`
 }

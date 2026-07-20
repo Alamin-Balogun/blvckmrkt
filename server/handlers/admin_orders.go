@@ -502,6 +502,15 @@ func AdminConfirmPayment(c *gin.Context) {
 
 	log.Printf("✅ Admin confirmed payment for order %s (ID=%d)", order.DisplayID, order.ID)
 
+	// Bank-transfer orders on Dellyman only get their courier pickup booked
+	// once an admin confirms the transfer actually landed — buildOrder
+	// already created the "quoted" delivery snapshot(s) at checkout time,
+	// this just triggers the real booking now that payment is confirmed.
+	if order.DeliveryType == models.DeliveryDellyman {
+		order.PaymentStatus = models.PaymentPaid
+		go bookDellymanShipmentsForOrder(order)
+	}
+
 	entityID := uint(id)
 	logActivity(c, "order", &entityID, "confirmed_payment",
 		fmt.Sprintf(`{"display_id":"%s","method":"%s"}`, order.DisplayID, order.PaymentMethod))

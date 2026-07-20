@@ -63,8 +63,20 @@ const ClockIcon = () => (
   </svg>
 );
 
+// Placeholder shown instead of a brand's own zones/local rates once the
+// platform is handling delivery itself via Dellyman — the real price is a
+// live courier quote fetched on the checkout page (it needs the buyer's
+// address, which isn't collected yet at this point in the flow).
+const DELLYMAN_DELIVERY_METHOD = {
+  id: "dellyman",
+  type: "dellyman",
+  name: "Courier delivery",
+  description: "Priced live at checkout based on your delivery address.",
+  flat_rate: 0,
+};
+
 // ── BrandShippingPanel ─────────────────────────────────────────────────────────
-function BrandShippingPanel({brand, brandId, items, onSelect, selected, fmtMoney, convert, baseCurrency}) {
+function BrandShippingPanel({brand, brandId, items, onSelect, selected, fmtMoney, convert, baseCurrency, dellymanMode}) {
   const [open, setOpen]         = useState(false);
   const [loading, setLoading]   = useState(false);
   const [shippingData, setData] = useState(null);
@@ -94,14 +106,18 @@ function BrandShippingPanel({brand, brandId, items, onSelect, selected, fmtMoney
         setFetched(true);
         // Auto-select the first available method if none selected yet
         if (!selected) {
-          const methods = [
-            ...safe.zones.flatMap((z) =>
-              (z.methods ?? []).map((m) => ({...m, type: "zone", zone: z}))
-            ),
-            ...safe.local.map((m) => ({...m, type: "local"})),
-          ];
-          if (methods.length > 0) {
-            onSelect(brandId, methods[0]);
+          if (dellymanMode) {
+            onSelect(brandId, DELLYMAN_DELIVERY_METHOD);
+          } else {
+            const methods = [
+              ...safe.zones.flatMap((z) =>
+                (z.methods ?? []).map((m) => ({...m, type: "zone", zone: z}))
+              ),
+              ...safe.local.map((m) => ({...m, type: "local"})),
+            ];
+            if (methods.length > 0) {
+              onSelect(brandId, methods[0]);
+            }
           }
         }
       })
@@ -117,22 +133,27 @@ function BrandShippingPanel({brand, brandId, items, onSelect, selected, fmtMoney
     setOpen((v) => !v);
   }, []);
 
-  const deliveryMethods = shippingData ? [
-    ...(shippingData.zones?.flatMap((z) =>
-      (z.methods ?? []).map((m) => ({...m, type: "zone", zone: z}))
-    ) ?? []),
-    ...(shippingData.local?.map((m) => ({
-      ...m,
-      type: "local",
-      name: [m.city, m.state, m.country].filter(Boolean).join(", "),
-      coverage: [
-        m.city    && `City: ${m.city}`,
-        m.state   && `State: ${m.state}`,
-        m.country && `Country: ${m.country}`,
-      ].filter(Boolean).join("  ·  "),
-      _currency: (m.currency_code || m.currency || baseCurrency || "NGN").toUpperCase(),
-    })) ?? []),
-  ] : [];
+  // While the platform handles delivery via Dellyman, a brand's own
+  // zones/local rates don't apply — only the live-priced courier option
+  // does. Pickup is unaffected: it stays brand-handled either way.
+  const deliveryMethods = dellymanMode
+    ? [DELLYMAN_DELIVERY_METHOD]
+    : shippingData ? [
+        ...(shippingData.zones?.flatMap((z) =>
+          (z.methods ?? []).map((m) => ({...m, type: "zone", zone: z}))
+        ) ?? []),
+        ...(shippingData.local?.map((m) => ({
+          ...m,
+          type: "local",
+          name: [m.city, m.state, m.country].filter(Boolean).join(", "),
+          coverage: [
+            m.city    && `City: ${m.city}`,
+            m.state   && `State: ${m.state}`,
+            m.country && `Country: ${m.country}`,
+          ].filter(Boolean).join("  ·  "),
+          _currency: (m.currency_code || m.currency || baseCurrency || "NGN").toUpperCase(),
+        })) ?? []),
+      ] : [];
 
   const pickupMethods = shippingData?.pickups ?? [];
 
@@ -653,6 +674,10 @@ export default function CartGrid() {
   const [updatingId,   setUpdatingId]  = useState(null);
   const [qtyError,     setQtyError]    = useState("");
   const [brandShipping, setBrandShipping] = useState({});
+  // Platform-wide toggle (admin setting): "dellyman" means the platform
+  // handles delivery itself via courier instead of each brand's own
+  // zones/local rates. Pickup is unaffected either way.
+  const [dellymanMode, setDellymanMode] = useState(false);
 
   const navigate = useNavigate();
 
@@ -661,6 +686,13 @@ export default function CartGrid() {
     if (!token) { navigate("/login"); return; }
     refreshCart();
   }, []); // eslint-disable-line
+
+  useEffect(() => {
+    fetch(`${API_BASE}/api/checkout/delivery-mode`)
+      .then((r) => r.json())
+      .then((json) => setDellymanMode((json?.data ?? json)?.delivery_mode === "dellyman"))
+      .catch(() => setDellymanMode(false));
+  }, []);
 
   useEffect(() => {
     if (!Array.isArray(cartItems) || !cartItems.length) {
@@ -1025,6 +1057,7 @@ export default function CartGrid() {
                       fmtMoney={fmtMoney}
                       convert={convert}
                       baseCurrency={baseCurrency}
+                      dellymanMode={dellymanMode}
                     />
                   </div>
                 </div>
