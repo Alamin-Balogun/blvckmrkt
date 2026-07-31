@@ -2,10 +2,11 @@ import Navbar from "../../components/navbar";
 import HeroSlider from "./home_components/heroslider";
 import FeatureCards from "./home_components/featurecards";
 import PerksStrip from "./home_components/perksstrip";
-import ProductShowcase from "./home_components/productshowcase";
+import ProductSections from "./home_components/productsections";
 import BrandsMarquee from "./home_components/brandsmarquee";
 // import Testimonials from "./home_components/testimonials";
 import FeaturedCollections from "./home_components/featuredcollections";
+import ProductShowcase from "./home_components/productshowcase";
 import PromoBanner from "./home_components/promobanner";
 import BlogSection from "./home_components/blogsection";
 import Services from "./home_components/services";
@@ -20,11 +21,14 @@ export default function Home() {
         <Navbar />
         <HeroSlider />
         <PerksStrip />
-        <FeatureCards />
         <BrandsMarquee />
-        <ProductShowcase />
+        {/* Products come first on mobile so buyers don't have to scroll
+            past the Drops/Brands/Culture trio to reach what they came for. */}
+        <ProductSections />
+        <FeatureCards />
         {/* <Testimonials /> */}
         <FeaturedCollections />
+        <ProductShowcase />
         <PromoBanner />
         <BlogSection />
         <Services />

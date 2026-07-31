@@ -17,9 +17,9 @@ import (
 // ── GET /api/admin/orders ─────────────────────────────────────────────────────
 func AdminListOrders(c *gin.Context) {
 	limit, offset := adminPageParams(c)
-	status        := c.Query("status")
+	status := c.Query("status")
 	paymentStatus := c.Query("payment_status")
-	search        := c.Query("search")
+	search := c.Query("search")
 
 	type OrderRow struct {
 		ID            uint                 `json:"id"`
@@ -364,6 +364,7 @@ func AdminGetOrder(c *gin.Context) {
 		Preload("PickupDetails").
 		Preload("ZoneDelivery").
 		Preload("LocalDelivery").
+		Preload("DellymanDeliveries").
 		Preload("PaymentTransfer").
 		Preload("PaymentGateway").
 		First(&order, id).Error; err != nil {
@@ -411,6 +412,10 @@ func AdminGetOrder(c *gin.Context) {
 		if order.LocalDelivery != nil {
 			response["delivery_details"] = order.LocalDelivery
 		}
+	case models.DeliveryDellyman:
+		if len(order.DellymanDeliveries) > 0 {
+			response["dellyman_deliveries"] = buildAdminDellymanDetails(order.DellymanDeliveries)
+		}
 	}
 
 	// Add payment details based on method
@@ -425,6 +430,76 @@ func AdminGetOrder(c *gin.Context) {
 	}
 
 	utils.OK(c, "Order fetched", response)
+}
+
+// buildAdminDellymanDetails enriches each per-brand Dellyman delivery row
+// with the brand's name/email and the pickup address text, so the admin
+// order page can show full courier + brand + destination info at a glance —
+// an order can span multiple brands, so this is a list, one entry per brand.
+func buildAdminDellymanDetails(rows []models.OrderDellymanDelivery) []gin.H {
+	brandIDs := make([]uint, 0, len(rows))
+	addrIDs := make([]uint, 0, len(rows))
+	for _, r := range rows {
+		brandIDs = append(brandIDs, r.BrandID)
+		addrIDs = append(addrIDs, r.PickupAddressID)
+	}
+
+	type brandWithEmail struct {
+		ID        uint
+		BrandName string
+		Email     string
+	}
+	var brands []brandWithEmail
+	database.DB.Table("brands b").
+		Select("b.id, b.brand_name, u.email").
+		Joins("LEFT JOIN users u ON u.id = b.user_id").
+		Where("b.id IN ?", brandIDs).
+		Scan(&brands)
+	brandMap := map[uint]brandWithEmail{}
+	for _, b := range brands {
+		brandMap[b.ID] = b
+	}
+
+	var addrs []models.Address
+	database.DB.Where("id IN ?", addrIDs).Find(&addrs)
+	addrMap := map[uint]models.Address{}
+	for _, a := range addrs {
+		addrMap[a.ID] = a
+	}
+
+	out := make([]gin.H, len(rows))
+	for i, r := range rows {
+		b := brandMap[r.BrandID]
+		pickupAddress := ""
+		if a, ok := addrMap[r.PickupAddressID]; ok {
+			parts := []string{a.Line1}
+			if a.Line2 != "" {
+				parts = append(parts, a.Line2)
+			}
+			parts = append(parts, a.City, a.Country)
+			pickupAddress = strings.Join(parts, ", ")
+		}
+		out[i] = gin.H{
+			"brand_id":               r.BrandID,
+			"brand_name":             b.BrandName,
+			"brand_email":            b.Email,
+			"pickup_address":         pickupAddress,
+			"delivery_contact_name":  r.DeliveryContactName,
+			"delivery_contact_phone": r.DeliveryContactPhone,
+			"delivery_address":       r.DeliveryAddress,
+			"delivery_landmark":      r.DeliveryLandmark,
+			"courier_company":        r.CompanyName,
+			"vehicle":                r.Vehicle,
+			"price":                  r.Price,
+			"currency":               r.Currency,
+			"dellyman_order_id":      r.DellymanOrderID,
+			"tracking_id":            r.TrackingID,
+			"status":                 r.Status,
+			"picked_up_at":           r.PickedUpAt,
+			"delivered_at":           r.DeliveredAt,
+		}
+	}
+	return out
 }
 
 // ── PATCH /api/admin/orders/:id ───────────────────────────────────────────────
@@ -445,8 +520,12 @@ func AdminUpdateOrder(c *gin.Context) {
 	}
 
 	updates := map[string]interface{}{}
-	if body.Status        != "" { updates["status"]         = body.Status        }
-	if body.PaymentStatus != "" { updates["payment_status"] = body.PaymentStatus }
+	if body.Status != "" {
+		updates["status"] = body.Status
+	}
+	if body.PaymentStatus != "" {
+		updates["payment_status"] = body.PaymentStatus
+	}
 
 	if len(updates) == 0 {
 		utils.BadRequest(c, "Provide status or payment_status", nil)
@@ -583,6 +662,80 @@ func AdminRejectPayment(c *gin.Context) {
 		"payment_status": "failed",
 		"status":         "cancelled",
 	})
+}
+
+// ── POST /api/admin/orders/:id/send-receipt ───────────────────────────────────
+// Admin-triggered — emails the buyer a branded receipt for the order.
+func AdminSendReceipt(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		utils.BadRequest(c, "Invalid order ID", nil)
+		return
+	}
+
+	var order models.Order
+	if err := database.DB.Preload("Items").First(&order, id).Error; err != nil {
+		utils.NotFound(c, "Order not found")
+		return
+	}
+
+	buyerName, buyerEmail := "Guest", order.ContactEmail
+	if order.UserID != nil {
+		var buyer models.User
+		if database.DB.Select("id, first_name, last_name, email").First(&buyer, *order.UserID).Error == nil {
+			buyerName = strings.TrimSpace(buyer.FirstName + " " + buyer.LastName)
+			buyerEmail = buyer.Email
+		}
+	}
+	if buyerEmail == "" {
+		utils.BadRequest(c, "This order has no buyer email on file", nil)
+		return
+	}
+
+	addressLine := ""
+	if order.AddressID != nil {
+		var addr models.Address
+		if database.DB.First(&addr, *order.AddressID).Error == nil {
+			parts := []string{addr.Line1}
+			if addr.Line2 != "" {
+				parts = append(parts, addr.Line2)
+			}
+			parts = append(parts, addr.City)
+			if addr.State != "" {
+				parts = append(parts, addr.State)
+			}
+			parts = append(parts, addr.Country)
+			addressLine = strings.Join(parts, ", ")
+		}
+	}
+
+	items := make([]utils.OrderConfirmationItem, len(order.Items))
+	for i, it := range order.Items {
+		items[i] = utils.OrderConfirmationItem{
+			Name: it.ProductName, Size: it.Size, Quantity: it.Quantity,
+			UnitPrice: it.UnitPrice, Total: it.TotalPrice, ImageURL: it.ImageURL,
+		}
+	}
+
+	err = utils.SendReceiptEmail(utils.ReceiptEmailData{
+		ToEmail: buyerEmail, BuyerName: buyerName,
+		OrderID: order.DisplayID, CreatedAt: order.CreatedAt.Format("Jan 2, 2006"),
+		PaymentMethod: order.PaymentMethod, PaymentStatus: string(order.PaymentStatus),
+		Address:  addressLine,
+		Subtotal: order.Subtotal, Tax: order.Tax, ShippingFee: order.ShippingFee, Total: order.Total,
+		Currency: order.Currency, Items: items,
+	})
+	if err != nil {
+		log.Printf("❌ AdminSendReceipt failed for order %d: %v", id, err)
+		utils.InternalError(c, "Failed to send receipt email: "+err.Error())
+		return
+	}
+
+	entityID := uint(id)
+	logActivity(c, "order", &entityID, "sent_receipt_email",
+		fmt.Sprintf(`{"display_id":"%s","to":"%s"}`, order.DisplayID, buyerEmail))
+
+	utils.OK(c, "Receipt emailed to "+buyerEmail, nil)
 }
 
 // ── DELETE /api/admin/orders/:id ──────────────────────────────────────────────

@@ -19,25 +19,33 @@ type Address struct {
 	State     string         `gorm:"type:varchar(100)"                    json:"state,omitempty"`
 	Postcode  string         `gorm:"type:varchar(20)"                     json:"postcode,omitempty"`
 	Country   string         `gorm:"type:varchar(100);not null"           json:"country"`
+	Phone     string         `gorm:"type:varchar(50)"                     json:"phone,omitempty"`
 	IsDefault bool           `gorm:"default:false"                        json:"is_default"`
-	CreatedAt time.Time      `                                            json:"created_at"`
-	UpdatedAt time.Time      `                                            json:"updated_at"`
-	DeletedAt gorm.DeletedAt `gorm:"index"                                json:"-"`
+	// IsDellymanPickup marks the one brand address Dellyman should collect
+	// orders from. Brand-only in practice (buyer addresses never set this),
+	// and independent of PickupLocation, which is the buyer-facing
+	// self-collect option — a brand can have one, both, or neither.
+	IsDellymanPickup bool           `gorm:"default:false;index"                  json:"is_dellyman_pickup"`
+	CreatedAt        time.Time      `                                            json:"created_at"`
+	UpdatedAt        time.Time      `                                            json:"updated_at"`
+	DeletedAt        gorm.DeletedAt `gorm:"index"                                json:"-"`
 }
 
 // AddressResponse is the safe DTO returned to the client
 type AddressResponse struct {
-	ID        uint      `json:"id"`
-	UserID    uint      `json:"user_id"`
-	Label     string    `json:"label"`
-	Line1     string    `json:"line1"`
-	Line2     string    `json:"line2,omitempty"`
-	City      string    `json:"city"`
-	State     string    `json:"state,omitempty"`
-	Postcode  string    `json:"postcode,omitempty"`
-	Country   string    `json:"country"`
-	IsDefault bool      `json:"is_default"`
-	CreatedAt time.Time `json:"created_at"`
+	ID               uint      `json:"id"`
+	UserID           uint      `json:"user_id"`
+	Label            string    `json:"label"`
+	Line1            string    `json:"line1"`
+	Line2            string    `json:"line2,omitempty"`
+	City             string    `json:"city"`
+	State            string    `json:"state,omitempty"`
+	Postcode         string    `json:"postcode,omitempty"`
+	Country          string    `json:"country"`
+	Phone            string    `json:"phone,omitempty"`
+	IsDefault        bool      `json:"is_default"`
+	IsDellymanPickup bool      `json:"is_dellyman_pickup"`
+	CreatedAt        time.Time `json:"created_at"`
 }
 
 func (a *Address) ToResponse() AddressResponse {
@@ -46,16 +54,18 @@ func (a *Address) ToResponse() AddressResponse {
 		userID = *a.UserID
 	}
 	return AddressResponse{
-		ID:        a.ID,
-		UserID:    userID,
-		Label:     a.Label,
-		Line1:     a.Line1,
-		Line2:     a.Line2,
-		City:      a.City,
-		State:     a.State,
-		Postcode:  a.Postcode,
-		Country:   a.Country,
-		IsDefault: a.IsDefault,
-		CreatedAt: a.CreatedAt,
+		ID:               a.ID,
+		UserID:           userID,
+		Label:            a.Label,
+		Line1:            a.Line1,
+		Line2:            a.Line2,
+		City:             a.City,
+		State:            a.State,
+		Postcode:         a.Postcode,
+		Country:          a.Country,
+		Phone:            a.Phone,
+		IsDefault:        a.IsDefault,
+		IsDellymanPickup: a.IsDellymanPickup,
+		CreatedAt:        a.CreatedAt,
 	}
 }

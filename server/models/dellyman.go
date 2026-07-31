@@ -17,14 +17,16 @@ const (
 
 // OrderDellymanDelivery is a per-brand snapshot of a Dellyman courier booking
 // for an order. An order can span multiple brands, and each brand ships from
-// its own pickup location, so there is one row per (order, brand) pair —
-// unlike OrderPickup/OrderZoneDelivery/OrderLocalDelivery which are 1:1 with
-// an order today.
+// its own Dellyman pickup address, so there is one row per (order, brand)
+// pair — unlike OrderPickup/OrderZoneDelivery/OrderLocalDelivery which are
+// 1:1 with an order today.
 type OrderDellymanDelivery struct {
-	ID               uint      `gorm:"primaryKey;autoIncrement"                json:"id"`
-	OrderID          uint      `gorm:"not null;index"                          json:"order_id"`
-	BrandID          uint      `gorm:"not null;index"                          json:"brand_id"`
-	PickupLocationID uint      `gorm:"not null"                                json:"pickup_location_id"`
+	ID              uint      `gorm:"primaryKey;autoIncrement"                json:"id"`
+	OrderID         uint      `gorm:"not null;index"                          json:"order_id"`
+	BrandID         uint      `gorm:"not null;index"                          json:"brand_id"`
+	// PickupAddressID references addresses.id — the brand's Address row
+	// flagged IsDellymanPickup, not the buyer-facing PickupLocation model.
+	PickupAddressID uint      `gorm:"not null"                                json:"pickup_address_id"`
 
 	// Destination snapshot (buyer)
 	DeliveryContactName  string `gorm:"type:varchar(200)"                      json:"delivery_contact_name"`

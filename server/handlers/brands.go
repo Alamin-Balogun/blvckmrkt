@@ -59,7 +59,7 @@ func GetPublicBrands(c *gin.Context) {
 			COALESCE(u.city, '')         AS city,
 			COALESCE(u.state_name, '')   AS state_name,
 			COALESCE(u.country_name, '') AS country_name,
-			COUNT(DISTINCT p.id)         AS product_count,
+			COUNT(DISTINCT CASE WHEN b.verification_status = 'verified' THEN p.id END) AS product_count,
 			b.is_exclusive               AS is_exclusive,
 			b.featured_rank              AS featured_rank
 		FROM brands b
@@ -68,7 +68,6 @@ func GetPublicBrands(c *gin.Context) {
 			AND p.status     = 'active'
 			AND p.deleted_at IS NULL
 		WHERE b.deleted_at IS NULL
-          AND b.verification_status = 'verified'
 		GROUP BY
 			b.id, b.display_id, b.brand_name, b.slug, b.description,
 			b.logo_url, b.banner_url, b.website, b.category,

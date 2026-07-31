@@ -2,6 +2,8 @@ import {useState, useEffect, useCallback, useRef} from "react";
 import {useParams, Link, useNavigate} from "react-router-dom";
 import {motion, AnimatePresence} from "framer-motion";
 import {useCartWishlist, getToken} from "../../../components/cartcontext";
+import ProductCard, {PRODUCT_CARD_CSS} from "../../../components/ProductCard";
+import useProductCardActions from "../../../components/useProductCardActions";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "https://blvckmrktng.com";
 
@@ -33,13 +35,21 @@ export default function ProductDetail() {
   const [selectedSizeId, setSelectedSizeId] = useState(null);
   const [qty, setQty] = useState(1);
   const [addedToCart, setAddedToCart] = useState(false);
-  const [activeTab, setActiveTab] = useState("Description");
+  // Accordion — every section starts collapsed; clicking a header expands
+  // just that section (independent of the others), matching the
+  // open-on-demand pattern instead of always showing Description by default.
+  const [openSections, setOpenSections] = useState({});
+  const toggleSection = (t) => setOpenSections((s) => ({...s, [t]: !s[t]}));
   const [zoomOpen, setZoomOpen] = useState(false);
   const [showSizeGuide, setShowSizeGuide] = useState(false);
   const [sizeGuideTab, setSizeGuideTab] = useState("tops");
   const [loadingCart, setLoadingCart] = useState(false);
   const [loadingWish, setLoadingWish] = useState(false);
   const cycleRef = useRef(null);
+
+  // Cart/wishlist wiring for the "You May Also Like" row's ProductCards —
+  // separate from this page's own main add-to-cart/wishlist buttons below.
+  const relatedActions = useProductCardActions();
 
   // ── Cart/Wishlist context ─────────────────────────────────────────────────
   const {
@@ -60,7 +70,7 @@ export default function ProductDetail() {
     setSize(null);
     setSelectedSizeId(null);
     setQty(1);
-    setActiveTab("Description");
+    setOpenSections({});
     setShipping(null);
 
     fetch(`${API_BASE}/api/shop/products/${slug}`)
@@ -105,9 +115,41 @@ export default function ProductDetail() {
     }
   };
 
-  // ── Fetch reviews ─────────────────────────────────────────────────────────
+  // ── Swipe through gallery images (main image + zoom overlay) ─────────────
+  const touchStartX = useRef(null);
+  const wasSwipe = useRef(false);
+  const handleTouchStart = (e) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+  const handleTouchEnd = (e) => {
+    if (touchStartX.current == null) return;
+    const deltaX = e.changedTouches[0].clientX - touchStartX.current;
+    touchStartX.current = null;
+    const imgs = buildImages(product);
+    if (imgs.length < 2 || Math.abs(deltaX) < 50) {
+      wasSwipe.current = false;
+      return;
+    }
+    wasSwipe.current = true;
+    if (deltaX < 0) {
+      setActiveImg((i) => (i + 1) % imgs.length);
+    } else {
+      setActiveImg((i) => (i - 1 + imgs.length) % imgs.length);
+    }
+  };
+  // Swiping shouldn't also trigger the tap-to-open/tap-to-close click that
+  // follows a touch on mobile browsers.
+  const handleGalleryClick = (openZoom) => {
+    if (wasSwipe.current) {
+      wasSwipe.current = false;
+      return;
+    }
+    openZoom();
+  };
+
+  // ── Fetch reviews when Reviews section opened ─────────────────────────────
   useEffect(() => {
-    if (activeTab !== "Reviews" || !product?.id) return;
+    if (!openSections.Reviews || !product?.id) return;
     setReviewsLoading(true);
     fetch(`${API_BASE}/api/shop/products/${product.id}/reviews`)
       .then((r) => r.json())
@@ -117,24 +159,24 @@ export default function ProductDetail() {
       })
       .catch(() => setReviews([]))
       .finally(() => setReviewsLoading(false));
-  }, [activeTab, product?.id]);
+  }, [openSections.Reviews, product?.id]);
 
-  // ── Fetch shipping when Shipping tab opened ───────────────────────────────
+  // ── Fetch shipping when Shipping section opened ───────────────────────────
   useEffect(() => {
-    if (activeTab !== "Shipping" || !product?.brand_id || shipping) return;
+    if (!openSections.Shipping || !product?.brand_id || shipping) return;
     setShippingLoading(true);
     fetch(`${API_BASE}/api/shop/brands/${product.brand_id}/shipping`)
       .then((r) => r.json())
       .then((json) => setShipping(json?.data ?? json))
       .catch(() => setShipping({zones: [], local: [], pickups: []}))
       .finally(() => setShippingLoading(false));
-  }, [activeTab, product?.brand_id]); // eslint-disable-line
+  }, [openSections.Shipping, product?.brand_id]); // eslint-disable-line
 
-  // ── Fetch related ─────────────────────────────────────────────────────────
+  // ── Fetch related — other pieces from the same brand ──────────────────────
   useEffect(() => {
-    if (!product) return;
+    if (!product?.brand_id) return;
     const params = new URLSearchParams();
-    if (product.category_id) params.set("category_id", product.category_id);
+    params.set("brand_id", product.brand_id);
     params.set("limit", 4);
     fetch(`${API_BASE}/api/shop/products?${params}`)
       .then((r) => r.json())
@@ -148,16 +190,14 @@ export default function ProductDetail() {
         setRelated(list.filter((p) => p.id !== product.id).slice(0, 4));
       })
       .catch(() => setRelated([]));
-  }, [product?.id, product?.category_id]); // eslint-disable-line
+  }, [product?.id, product?.brand_id]); // eslint-disable-line
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   const handleAddToCart = async () => {
     if (!selectedSize && (product.sizes?.length ?? 0) > 0) return;
     if (buyDisabled) return;
-    if (!getToken()) {
-      navigate("/login");
-      return;
-    }
+    // No login required — guests get a localStorage cart (see cartcontext.jsx)
+    // that checks out the same way Buy Now already did.
     setLoadingCart(true);
     setAddedToCart(true);
     await ctxAddToCart(product.id, selectedSizeId);
@@ -395,18 +435,12 @@ const handleBuyNow = () => {
         .pd-wish-btn { width: 48px; height: 48px; border: 1px solid rgba(255,255,255,0.12); background: none; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0; }
         .pd-wish-btn.active { border-color: #ef4444; background: rgba(239,68,68,0.1); }
         .pd-wish-btn:hover { border-color: #ef4444; }
-        .pd-perks { display: flex; flex-direction: column; gap: 10px; }
-        .pd-perk { display: flex; align-items: center; gap: 10px; }
-        .pd-perk-icon { width: 28px; height: 28px; border-radius: 6px; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.2); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-        .pd-perk span { color: rgba(255,255,255,0.4); font-size: 11px; letter-spacing: 0.04em; }
-        .pd-perk strong { color: rgba(255,255,255,0.75); }
-        .pd-tabs { max-width: 1280px; margin: 60px auto 0; padding: 0 48px; }
-        @media (max-width: 600px) { .pd-tabs { padding: 0 20px; } }
-        .pd-tab-nav { display: flex; gap: 0; border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: 28px; overflow-x: auto; }
-        .pd-tab-btn { background: none; border: none; border-bottom: 2px solid transparent; color: rgba(255,255,255,0.3); font-size: 10px; font-weight: 900; letter-spacing: 0.22em; text-transform: uppercase; padding: 12px 20px; cursor: pointer; transition: all 0.2s; margin-bottom: -1px; white-space: nowrap; }
-        .pd-tab-btn:hover { color: #fff; }
-        .pd-tab-btn.active { color: #fff; border-bottom-color: #ef4444; }
-        .pd-tab-body { color: rgba(255,255,255,0.5); font-size: 13px; line-height: 1.8; }
+        .pd-tabs { max-width: 1280px; margin: 60px auto 0; padding: 0 48px 24px; }
+        @media (max-width: 600px) { .pd-tabs { padding: 0 20px 24px; } }
+        .pd-accordion-item { border-bottom: 1px solid rgba(255,255,255,0.08); }
+        .pd-accordion-header { width: 100%; display: flex; align-items: center; justify-content: space-between; background: none; border: none; color: rgba(255,255,255,0.7); font-size: 10px; font-weight: 900; letter-spacing: 0.22em; text-transform: uppercase; padding: 18px 4px; cursor: pointer; transition: color 0.2s; }
+        .pd-accordion-header:hover { color: #fff; }
+        .pd-tab-body { color: rgba(255,255,255,0.5); font-size: 13px; line-height: 1.8; padding: 0 4px 22px; }
         .pd-tab-body ul { display: flex; flex-direction: column; gap: 8px; padding: 0; list-style: none; margin: 0; }
         .pd-tab-body li { display: flex; align-items: center; gap: 10px; }
         .pd-tab-body li::before { content: ''; width: 4px; height: 4px; background: #ef4444; border-radius: 50%; flex-shrink: 0; }
@@ -494,9 +528,11 @@ const handleBuyNow = () => {
             {/* Main image — auto-cycles, advances on hover */}
             <div
               className="pd-main-img"
-              onClick={() => setZoomOpen(true)}
+              onClick={() => handleGalleryClick(() => setZoomOpen(true))}
               onMouseEnter={handleImgHover}
-              onMouseLeave={() => setIsHovering(false)}>
+              onMouseLeave={() => setIsHovering(false)}
+              onTouchStart={handleTouchStart}
+              onTouchEnd={handleTouchEnd}>
               <AnimatePresence mode="wait">
                 <motion.img
                   key={activeImg}
@@ -686,6 +722,12 @@ const handleBuyNow = () => {
                   </span>
                 </div>
               )}
+              {product.weight > 0 && (
+                <div className="pd-meta-chip">
+                  <span className="pd-meta-key">Weight</span>
+                  <span className="pd-meta-val">{product.weight} kg</span>
+                </div>
+              )}
             </div>
 
             <div className="pd-divider" />
@@ -835,115 +877,46 @@ const handleBuyNow = () => {
                 </>
               )}
             </button>
-
-            <div className="pd-divider" />
-
-            <div className="pd-perks">
-              {[
-                {
-                  icon: (
-                    <svg
-                      width="13"
-                      height="13"
-                      fill="none"
-                      stroke="#ef4444"
-                      strokeWidth="2"
-                      viewBox="0 0 24 24">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-                      />
-                    </svg>
-                  ),
-                  text: (
-                    <>
-                      <strong>100% Authentic</strong> — every item verified before dispatch
-                    </>
-                  ),
-                },
-                {
-                  icon: (
-                    <svg
-                      width="13"
-                      height="13"
-                      fill="none"
-                      stroke="#ef4444"
-                      strokeWidth="2"
-                      viewBox="0 0 24 24">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"
-                      />
-                    </svg>
-                  ),
-                  text: (
-                    <>
-                      <strong>Free shipping</strong> on orders over ₦50,000
-                    </>
-                  ),
-                },
-                {
-                  icon: (
-                    <svg
-                      width="13"
-                      height="13"
-                      fill="none"
-                      stroke="#ef4444"
-                      strokeWidth="2"
-                      viewBox="0 0 24 24">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
-                      />
-                    </svg>
-                  ),
-                  text: (
-                    <>
-                      <strong>14-day returns</strong> — hassle-free
-                    </>
-                  ),
-                },
-              ].map((p, i) => (
-                <div key={i} className="pd-perk">
-                  <div className="pd-perk-icon">{p.icon}</div>
-                  <span>{p.text}</span>
-                </div>
-              ))}
-            </div>
           </motion.div>
         </div>
       </div>
 
       {/* ── Tabs ── */}
       <div className="pd-tabs">
-        <div className="pd-tab-nav">
-          {tabs.map((t) => (
-            <button
-              key={t}
-              className={`pd-tab-btn ${activeTab === t ? "active" : ""}`}
-              onClick={() => setActiveTab(t)}>
-              {t}
+        {tabs.map((t) => (
+          <div key={t} className="pd-accordion-item">
+            <button className="pd-accordion-header" onClick={() => toggleSection(t)}>
+              <span>{t}</span>
+              <svg
+                width="12"
+                height="12"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                viewBox="0 0 24 24"
+                style={{
+                  transition: "transform 0.2s",
+                  transform: openSections[t] ? "rotate(180deg)" : "none",
+                }}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
             </button>
-          ))}
-        </div>
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={activeTab}
-            initial={{opacity: 0, y: 8}}
-            animate={{opacity: 1, y: 0}}
-            exit={{opacity: 0}}
-            transition={{duration: 0.25}}
-            className="pd-tab-body">
-            {activeTab === "Description" && (
+            <AnimatePresence initial={false}>
+              {openSections[t] && (
+                <motion.div
+                  initial={{height: 0, opacity: 0}}
+                  animate={{height: "auto", opacity: 1}}
+                  exit={{height: 0, opacity: 0}}
+                  transition={{duration: 0.25}}
+                  className="pd-tab-body"
+                  style={{overflow: "hidden"}}>
+            {t === "Description" && (
               <p className="pd-desc-text" style={{maxWidth: 720}}>
                 {product.description || "No description available."}
               </p>
             )}
 
-            {activeTab === "Shipping" && (
+            {t === "Shipping" && (
               <div>
                 {shippingLoading ? (
                   <div className="pd-ship-layout">
@@ -1219,7 +1192,7 @@ const handleBuyNow = () => {
               </div>
             )}
 
-{activeTab === "Reviews" && (
+{t === "Reviews" && (
   <div style={{display: "flex", flexDirection: "column", gap: 20, maxWidth: 720}}>
     {reviewsLoading ? (
       <div style={{display: "flex", flexDirection: "column", gap: 12}}>
@@ -1331,8 +1304,11 @@ const handleBuyNow = () => {
     )}
   </div>
 )}
-          </motion.div>
-        </AnimatePresence>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        ))}
       </div>
 
       {/* ── Related ── */}
@@ -1359,95 +1335,26 @@ const handleBuyNow = () => {
               You May Also Like
             </h2>
           </div>
+          <style>{PRODUCT_CARD_CSS}</style>
           <div className="pd-related-grid">
-            {related.map((p, i) => {
-              const relImg = p.primary_image || (p.images?.[0]?.url ?? p.images?.[0]) || "";
-              return (
-                <motion.div
-                  key={p.id}
-                  initial={{opacity: 0, y: 16}}
-                  animate={{opacity: 1, y: 0}}
-                  transition={{duration: 0.35, delay: i * 0.07}}
-                  className="pd-rel-card">
-                  <Link to={`/shop/${p.slug || p.id}`} style={{textDecoration: "none"}}>
-                    <div className="pd-rel-img">
-                      {relImg ? (
-                        <img src={relImg} alt={p.name} />
-                      ) : (
-                        <div
-                          style={{
-                            width: "100%",
-                            height: "100%",
-                            background: "rgba(255,255,255,0.04)",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                          }}>
-                          <span
-                            style={{
-                              color: "rgba(255,255,255,0.1)",
-                              fontSize: 10,
-                              letterSpacing: "0.2em",
-                              textTransform: "uppercase",
-                            }}>
-                            No Image
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    <div className="pd-rel-body">
-                      <p
-                        style={{
-                          color: "rgba(255,255,255,0.28)",
-                          fontSize: 9,
-                          fontWeight: 700,
-                          letterSpacing: "0.2em",
-                          textTransform: "uppercase",
-                          margin: "0 0 4px",
-                        }}>
-                        {p.brand_name}
-                      </p>
-                      <p
-                        style={{
-                          fontFamily: "'Bebas Neue', sans-serif",
-                          fontSize: "0.95rem",
-                          color: "#fff",
-                          letterSpacing: "0.05em",
-                          margin: "0 0 8px",
-                          lineHeight: 1.2,
-                        }}>
-                        {p.name}
-                      </p>
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                        }}>
-                        <span
-                          style={{
-                            fontFamily: "'Bebas Neue', sans-serif",
-                            fontSize: "1.1rem",
-                            color: "#ef4444",
-                          }}>
-                          {fmt(p.price)}
-                        </span>
-                        <span
-                          style={{
-                            color: "rgba(255,255,255,0.3)",
-                            fontSize: 9,
-                            fontWeight: 700,
-                            letterSpacing: "0.15em",
-                            textTransform: "uppercase",
-                          }}>
-                          View →
-                        </span>
-                      </div>
-                    </div>
-                  </Link>
-                </motion.div>
-              );
-            })}
+            {related.map((p, i) => (
+              <motion.div
+                key={p.id}
+                initial={{opacity: 0, y: 16}}
+                animate={{opacity: 1, y: 0}}
+                transition={{duration: 0.35, delay: i * 0.07}}>
+                <ProductCard
+                  product={p}
+                  inCart={relatedActions.cartIds.includes(p.id)}
+                  inWishlist={relatedActions.wishlistIds.includes(p.id)}
+                  justAdded={relatedActions.addedId === p.id}
+                  cartLoading={relatedActions.loadingCartId === p.id}
+                  wishLoading={relatedActions.loadingWishId === p.id}
+                  onAddToCart={relatedActions.onAddToCart}
+                  onToggleWishlist={relatedActions.onToggleWishlist}
+                />
+              </motion.div>
+            ))}
           </div>
         </div>
       )}
@@ -1460,8 +1367,11 @@ const handleBuyNow = () => {
             animate={{opacity: 1}}
             exit={{opacity: 0}}
             className="pd-zoom-overlay"
-            onClick={() => setZoomOpen(false)}>
+            onClick={() => handleGalleryClick(() => setZoomOpen(false))}
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}>
             <motion.img
+              key={activeImg}
               initial={{scale: 0.9}}
               animate={{scale: 1}}
               exit={{scale: 0.9}}

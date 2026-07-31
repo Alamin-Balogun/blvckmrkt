@@ -3,6 +3,7 @@ package config
 import (
 	"log"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -23,6 +24,10 @@ type Config struct {
 	ResendAPIKey  string // from Resend dashboard → API Keys
 	EmailFrom     string // e.g. onboarding@resend.dev (dev) or noreply@blvckmrkt.com (prod)
 	EmailFromName string // display name shown in inbox e.g. "BLVCKMRKT"
+	// SupportEmail receives operational alerts that need a human to act —
+	// e.g. manually cancelling a Dellyman booking, since Dellyman has no
+	// cancel-order API endpoint.
+	SupportEmail string
 
 	// Dellyman — third-party delivery courier (https://dellyman.com/rest-api/)
 	// DellymanBaseURL defaults to their sandbox; switch to the live API base
@@ -36,6 +41,11 @@ type Config struct {
 	DellymanDefaultVehicle     string
 	DellymanDefaultPaymentMode string
 	DellymanPickupWindow       string
+	// DellymanDefaultPackageWeight (kg) — Dellyman rejects BookOrder with
+	// "Package weight must be a valid number greater than 0" if omitted, but
+	// we don't collect a real per-product weight yet. Used as a flat
+	// placeholder on every package until product-level weight exists.
+	DellymanDefaultPackageWeight float64
 }
 
 var App *Config
@@ -61,18 +71,25 @@ func Load() {
 		JWTSecret:     getEnv("JWT_SECRET", "change-me"),
 		JWTExpiresIn:  jwtDuration,
 		AllowedOrigin: getEnv("ALLOWED_ORIGIN", "http://localhost:5173"),
-		ResendAPIKey:  getEnv("RESEND_API_KEY", "re_M896jNBj_9xA7j4MzZBTxkDjaFa2EvV6E"),
+		ResendAPIKey:  getEnv("RESEND_API_KEY", ""),
 		EmailFrom:     getEnv("EMAIL_FROM", "onboarding@resend.dev"),
 		EmailFromName: getEnv("EMAIL_FROM_NAME", "BLVCKMRKT"),
+		SupportEmail:  getEnv("SUPPORT_EMAIL", "blvckmrkt.market@gmail.com"),
 
 		DellymanAPIKey:        getEnv("DELLYMAN_API_KEY", ""),
 		DellymanBaseURL:       getEnv("DELLYMAN_BASE_URL", "https://dev.dellyman.com/api/v3.0"),
 		DellymanWebhookSecret: getEnv("DELLYMAN_WEBHOOK_SECRET", ""),
 
 		DellymanDefaultVehicle:     getEnv("DELLYMAN_DEFAULT_VEHICLE", "Bike"),
-		DellymanDefaultPaymentMode: getEnv("DELLYMAN_DEFAULT_PAYMENT_MODE", "Wallet"),
+		DellymanDefaultPaymentMode: getEnv("DELLYMAN_DEFAULT_PAYMENT_MODE", "online"),
 		DellymanPickupWindow:       getEnv("DELLYMAN_PICKUP_WINDOW", "09:00 AM to 06:00 PM"),
 	}
+
+	weight, err := strconv.ParseFloat(getEnv("DELLYMAN_DEFAULT_PACKAGE_WEIGHT", "1"), 64)
+	if err != nil || weight <= 0 {
+		weight = 1
+	}
+	App.DellymanDefaultPackageWeight = weight
 
 	log.Printf("[config] loaded — env=%s port=%s db=%s@%s/%s",
 		App.Env, App.Port, App.DBUser, App.DBHost, App.DBName)

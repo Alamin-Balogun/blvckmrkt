@@ -11,24 +11,45 @@ import (
 
 // ── BrandOrderResponse ────────────────────────────────────────────────────────
 type BrandOrderResponse struct {
-	OrderID         uint                 `json:"order_id"`
-	DisplayID       string               `json:"display_id"`
-	Status          models.OrderStatus   `json:"status"`
-	PaymentStatus   models.PaymentStatus `json:"payment_status"`
-	CreatedAt       string               `json:"created_at"`
-	BuyerName       string               `json:"buyer_name"`
-	BuyerEmail      string               `json:"buyer_email"`
-	Items           []models.OrderItem   `json:"items"`
-	BrandTotal      float64              `json:"brand_total"`
-	DeliveryType    string               `json:"delivery_type"`
-	DeliveryAddress *DeliveryAddressInfo `json:"delivery_address,omitempty"`
-	PickupInfo      *PickupInfo          `json:"pickup_info,omitempty"`
-	BuyerPhone      string               `json:"buyer_phone,omitempty"`
-	ContactPhone    string               `json:"contact_phone,omitempty"`
-	ContactEmail    string               `json:"contact_email,omitempty"`
-	PayoutStatus    string               `json:"payout_status,omitempty"`
-	PayoutAmount    float64              `json:"payout_amount,omitempty"`
-	PayoutRef       string               `json:"payout_ref,omitempty"`
+	OrderID          uint                 `json:"order_id"`
+	DisplayID        string               `json:"display_id"`
+	Status           models.OrderStatus   `json:"status"`
+	PaymentStatus    models.PaymentStatus `json:"payment_status"`
+	CreatedAt        string               `json:"created_at"`
+	BuyerName        string               `json:"buyer_name"`
+	BuyerEmail       string               `json:"buyer_email"`
+	Items            []models.OrderItem   `json:"items"`
+	BrandTotal       float64              `json:"brand_total"`
+	DeliveryType     string               `json:"delivery_type"`
+	DeliveryAddress  *DeliveryAddressInfo `json:"delivery_address,omitempty"`
+	PickupInfo       *PickupInfo          `json:"pickup_info,omitempty"`
+	BuyerPhone       string               `json:"buyer_phone,omitempty"`
+	ContactPhone     string               `json:"contact_phone,omitempty"`
+	ContactEmail     string               `json:"contact_email,omitempty"`
+	PayoutStatus     string               `json:"payout_status,omitempty"`
+	PayoutAmount     float64              `json:"payout_amount,omitempty"`
+	PayoutRef        string               `json:"payout_ref,omitempty"`
+	CanCancel        bool                 `json:"can_cancel"`
+	DellymanDelivery *BrandDellymanInfo   `json:"dellyman_delivery,omitempty"`
+}
+
+// BrandDellymanInfo is the brand-facing view of their own Dellyman courier
+// booking for an order — enough to show status and drive the manual
+// "confirm handoff to courier" action.
+type BrandDellymanInfo struct {
+	DeliveryID       uint   `json:"delivery_id"`
+	Status           string `json:"status"`
+	CourierCompany   string `json:"courier_company,omitempty"`
+	TrackingID       string `json:"tracking_id,omitempty"`
+	CanConfirmPickup bool   `json:"can_confirm_pickup"`
+}
+
+func buildBrandDellymanInfo(d models.OrderDellymanDelivery) *BrandDellymanInfo {
+	return &BrandDellymanInfo{
+		DeliveryID: d.ID, Status: string(d.Status),
+		CourierCompany: d.CompanyName, TrackingID: d.TrackingID,
+		CanConfirmPickup: d.Status == models.DellymanBooked,
+	}
 }
 
 type DeliveryAddressInfo struct {
@@ -180,6 +201,13 @@ func BrandListOrders(c *gin.Context) {
 		localMap[l.OrderID] = l
 	}
 
+	var dellymanRows []models.OrderDellymanDelivery
+	database.DB.Where("order_id IN ? AND brand_id = ?", pagedIDs, brand.ID).Find(&dellymanRows)
+	dellymanMap := map[uint]models.OrderDellymanDelivery{}
+	for _, d := range dellymanRows {
+		dellymanMap[d.OrderID] = d
+	}
+
 	// Batch-fetch the actual saved Address rows for street-level detail —
 	// the zone/local snapshot tables above only have country/state/city.
 	var addrIDs []uint
@@ -263,6 +291,7 @@ func BrandListOrders(c *gin.Context) {
 			DeliveryType:  deliveryTypeMap[o.ID],
 			ContactPhone:  o.ContactPhone,
 			ContactEmail:  o.ContactEmail,
+			CanCancel:     canCancelOrder(o),
 		}
 
 		var streetAddr models.Address
@@ -319,6 +348,9 @@ func BrandListOrders(c *gin.Context) {
 			row.PayoutStatus = p.Status
 			row.PayoutAmount = p.Amount
 			row.PayoutRef = p.Reference
+		}
+		if d, ok := dellymanMap[o.ID]; ok {
+			row.DellymanDelivery = buildBrandDellymanInfo(d)
 		}
 		result = append(result, row)
 	}
@@ -382,18 +414,28 @@ func BrandGetOrder(c *gin.Context) {
 		brandTotal += it.TotalPrice
 	}
 
+	var dellymanDelivery *BrandDellymanInfo
+	if order.DeliveryType == models.DeliveryDellyman {
+		var row models.OrderDellymanDelivery
+		if database.DB.Where("order_id = ? AND brand_id = ?", orderID, brand.ID).First(&row).Error == nil {
+			dellymanDelivery = buildBrandDellymanInfo(row)
+		}
+	}
+
 	utils.OK(c, "Order fetched", gin.H{
-		"order_id":       order.ID,
-		"display_id":     order.DisplayID,
-		"status":         order.Status,
-		"payment_status": order.PaymentStatus,
-		"created_at":     order.CreatedAt.Format("Jan 02, 2006"),
-		"buyer_name":     buyerName,
-		"buyer_email":    buyerEmail,
-		"address":        address,
-		"items":          items,
-		"brand_total":    brandTotal,
-		"notes":          order.Notes,
+		"order_id":          order.ID,
+		"display_id":        order.DisplayID,
+		"status":            order.Status,
+		"payment_status":    order.PaymentStatus,
+		"created_at":        order.CreatedAt.Format("Jan 02, 2006"),
+		"buyer_name":        buyerName,
+		"buyer_email":       buyerEmail,
+		"address":           address,
+		"items":             items,
+		"brand_total":       brandTotal,
+		"notes":             order.Notes,
+		"can_cancel":        canCancelOrder(order),
+		"dellyman_delivery": dellymanDelivery,
 	})
 }
 
@@ -429,9 +471,34 @@ func BrandUpdateOrderStatus(c *gin.Context) {
 		"processing": true,
 		"shipped":    true,
 		"delivered":  true,
+		"cancelled":  true,
 	}
 	if !allowed[req.Status] {
-		utils.BadRequest(c, "Brands can set status to: processing, shipped, or delivered", nil)
+		utils.BadRequest(c, "Brands can set status to: processing, shipped, delivered, or cancelled", nil)
+		return
+	}
+
+	// Cancelling has extra rules the other statuses don't: only within the
+	// 3-day window, and it's whole-order (this endpoint has always updated
+	// Order.Status directly, not per-brand — an order spanning multiple
+	// brands gets cancelled entirely, same as every other status here).
+	if req.Status == "cancelled" {
+		var order models.Order
+		if err := database.DB.First(&order, orderID).Error; err != nil {
+			utils.NotFound(c, "Order not found")
+			return
+		}
+		if !canCancelOrder(order) {
+			if order.Status != models.OrderPending && order.Status != models.OrderProcessing {
+				utils.BadRequest(c, "Only pending or processing orders can be cancelled", nil)
+			} else {
+				utils.BadRequest(c, "This order was placed more than 3 days ago and can no longer be cancelled", nil)
+			}
+			return
+		}
+		database.DB.Model(&order).Update("status", models.OrderCancelled)
+		cancelDellymanDeliveriesForOrder(order.ID)
+		utils.OK(c, "Order cancelled", gin.H{"order_id": orderID, "status": req.Status})
 		return
 	}
 

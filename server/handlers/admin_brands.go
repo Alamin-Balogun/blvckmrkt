@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"strconv"
@@ -420,7 +421,46 @@ func AdminDeleteBrand(c *gin.Context) {
 		return
 	}
 
-	database.DB.Delete(&brand)
+	// Hard-delete (not a soft delete): brand.Slug and Brand.UserID both carry a
+	// unique index. A soft delete leaves the row in place with those values
+	// still occupied, permanently blocking any future brand from reusing the
+	// same slug/name (or the same user re-registering a brand) even though it
+	// looks "deleted" everywhere in the UI. Archive to audit_log first so an
+	// admin can still restore it later via AdminRestoreAuditLog, same as
+	// AdminDeleteUser/BrandDeleteOwnAccount already do.
+	brandData, err := json.Marshal(brand)
+	if err != nil {
+		utils.InternalError(c, "Failed to archive brand")
+		return
+	}
+	ipAddress := c.ClientIP()
+	audit := models.AuditLog{
+		Table:      "brands",
+		RecordID:   int(brand.ID),
+		RecordData: string(brandData),
+		IPAddress:  &ipAddress,
+		CanRestore: true,
+	}
+
+	tx := database.DB.Begin()
+	if tx.Error != nil {
+		utils.InternalError(c, "Database transaction error")
+		return
+	}
+	if err := tx.Create(&audit).Error; err != nil {
+		tx.Rollback()
+		utils.InternalError(c, "Failed to archive brand")
+		return
+	}
+	if err := tx.Unscoped().Delete(&brand).Error; err != nil {
+		tx.Rollback()
+		utils.InternalError(c, "Failed to delete brand")
+		return
+	}
+	if err := tx.Commit().Error; err != nil {
+		utils.InternalError(c, "Failed to commit deletion")
+		return
+	}
 
 	entityID := uint(id)
 	logActivity(c, "brand", &entityID, "delete_brand",

@@ -17,6 +17,7 @@ type CartItemResponse struct {
 	Product       *ProductSummary `json:"product,omitempty"`
 	SelectedSize  string          `json:"selected_size,omitempty"`
 	LineTotal     float64         `json:"line_total"`
+	LineWeight    float64         `json:"line_weight"` // kg — product weight × quantity
 }
 
 // ── GET /api/buyer/cart ───────────────────────────────────────────────────────
@@ -44,15 +45,18 @@ func GetCart(c *gin.Context) {
 
 	resp := make([]CartItemResponse, len(items))
 	cartTotal := 0.0
+	cartWeight := 0.0
 	for i, item := range items {
 		r := CartItemResponse{
 			ID: item.ID, ProductID: item.ProductID,
 			ProductSizeID: item.ProductSizeID, Quantity: item.Quantity,
 		}
 		if p, ok := productMap[item.ProductID]; ok {
-			r.Product   = &p
+			r.Product    = &p
 			r.LineTotal  = p.Price * float64(item.Quantity)
+			r.LineWeight = p.Weight * float64(item.Quantity)
 			cartTotal   += r.LineTotal
+			cartWeight  += r.LineWeight
 		}
 		if item.ProductSizeID != nil {
 			if sz, ok := sizeMap[*item.ProductSizeID]; ok { r.SelectedSize = sz }
@@ -60,7 +64,9 @@ func GetCart(c *gin.Context) {
 		resp[i] = r
 	}
 
-	utils.OK(c, "Cart fetched", gin.H{"items": resp, "total": cartTotal, "count": len(items)})
+	utils.OK(c, "Cart fetched", gin.H{
+		"items": resp, "total": cartTotal, "count": len(items), "total_weight": cartWeight,
+	})
 }
 
 // ── POST /api/buyer/cart ──────────────────────────────────────────────────────

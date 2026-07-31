@@ -162,6 +162,7 @@ function ProductModal({
     name: "",
     description: "",
     price: initialPrice,
+    weight: "",
     status: "draft",
     category_id: "",
     tags: "",
@@ -172,6 +173,7 @@ function ProductModal({
     ...initial,
     // Override price with the brand's original asking price (see above)
     price: initialPrice,
+    weight: initial?.weight ?? "",
     category_id: initial?.category_id ? String(initial.category_id) : "",
     is_featured: initial?.is_featured ?? false,
     in_drop: alreadyInDrop,
@@ -192,6 +194,7 @@ function ProductModal({
       ...form,
       // Send the brand's asking price — the backend applies commission server-side
       price: parseFloat(form.price) || 0,
+      weight: parseFloat(form.weight) || 0,
       category_id: form.category_id ? parseInt(form.category_id) : null,
       images: form.images.filter((i) => i.url),
       sizes: form.sizes.filter((s) => s.size),
@@ -419,6 +422,25 @@ function ProductModal({
                 {commissionRate < platformCommissionRate ? "better" : "different"} rate
               </p>
             )}
+          </div>
+
+          {/* Weight — used to calculate Dellyman courier pricing at checkout */}
+          <div>
+            <Lbl c="Weight (kg) *" />
+            <input
+              type="number"
+              step="0.1"
+              min="0.1"
+              value={form.weight}
+              onChange={set("weight")}
+              style={inp}
+              onFocus={focus}
+              onBlur={blur}
+              placeholder="2.0"
+            />
+            <p style={{color: "rgba(255,255,255,0.25)", fontSize: 10, marginTop: 5}}>
+              Packed weight in kilograms — used to price courier delivery.
+            </p>
           </div>
 
           {/* Category + Status */}

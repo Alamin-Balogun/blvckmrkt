@@ -94,7 +94,6 @@ export default function NewlyDropped() {
 
   // ── doAddToCart — identical to ProductGrid ────────────────────────────────
   const doAddToCart = async (productId, sizeId) => {
-    if (!getToken()) { navigate("/login"); return; }
     setLoadingCartId(productId);
     setAddedId(productId);
     setTimeout(() => setAddedId(null), 1500);
@@ -115,11 +114,11 @@ export default function NewlyDropped() {
   const handleQuickAdd = async (product, e) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!getToken()) { navigate("/login"); return; }
 
     const promises = [];
 
-    // Add to wishlist immediately regardless of sizes
+    // Add to wishlist immediately regardless of sizes — ctxAddToWishlist
+    // already no-ops for guests, so this half just quietly skips for them.
     if (!wishlist.includes(product.id)) {
       promises.push(ctxAddToWishlist(product.id));
     }

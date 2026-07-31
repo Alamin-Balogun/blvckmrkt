@@ -99,15 +99,15 @@ func GetVehicles() ([]DellymanVehicle, error) {
 // ── Quotes ─────────────────────────────────────────────────────────────────
 
 type QuoteRequest struct {
-	PaymentMode         string   `json:"PaymentMode"`
-	Vehicle             string   `json:"Vehicle"`
-	PickupRequestedDate string   `json:"PickupRequestedDate"` // "YYYY/MM/DD"
-	PickupRequestedTime string   `json:"PickupRequestedTime"` // e.g. "08:00 AM to 05:00 PM"
-	PickupAddress       string   `json:"PickupAddress"`
-	DeliveryAddress     []string `json:"DeliveryAddress"`
-	IsInstantDelivery   *int     `json:"IsInstantDelivery,omitempty"`
-	IsProductOrder      *int     `json:"IsProductOrder,omitempty"`
-	ProductAmount       float64  `json:"ProductAmount,omitempty"`
+	PaymentMode         string    `json:"PaymentMode"`
+	Vehicle             string    `json:"Vehicle"`
+	PickupRequestedDate string    `json:"PickupRequestedDate"` // "YYYY/MM/DD"
+	PickupRequestedTime string    `json:"PickupRequestedTime"` // e.g. "08:00 AM to 05:00 PM"
+	PickupAddress       string    `json:"PickupAddress"`
+	DeliveryAddress     []string  `json:"DeliveryAddress"`
+	IsInstantDelivery   *int      `json:"IsInstantDelivery,omitempty"`
+	IsProductOrder      *int      `json:"IsProductOrder,omitempty"`
+	ProductAmount       []float64 `json:"ProductAmount,omitempty"`
 }
 
 type QuoteCompany struct {
@@ -120,7 +120,7 @@ type QuoteCompany struct {
 
 type QuoteResponse struct {
 	ResponseCode int            `json:"ResponseCode"`
-	Message      string         `json:"Message"`
+	Message      string         `json:"ResponseMessage"`
 	Companies    []QuoteCompany `json:"Companies"`
 	Distance     float64        `json:"Distance"`
 }
@@ -139,29 +139,35 @@ func GetQuotes(req QuoteRequest) (*QuoteResponse, error) {
 // ── Booking ────────────────────────────────────────────────────────────────
 
 type BookPackage struct {
-	PackageDescription          string  `json:"PackageDescription"`
-	DeliveryContactName         string  `json:"DeliveryContactName"`
-	DeliveryContactNumber       string  `json:"DeliveryContactNumber"`
-	PackageWeight                float64 `json:"PackageWeight"`
-	DeliveryGooglePlaceAddress  string  `json:"DeliveryGooglePlaceAddress"`
-	DeliveryLandmark            string  `json:"DeliveryLandmark,omitempty"`
-	ProductAmount                float64 `json:"ProductAmount,omitempty"`
+	PackageDescription         string  `json:"PackageDescription"`
+	DeliveryContactName        string  `json:"DeliveryContactName"`
+	DeliveryContactNumber      string  `json:"DeliveryContactNumber"`
+	PackageWeight              float64 `json:"PackageWeight"`
+	DeliveryGooglePlaceAddress string  `json:"DeliveryGooglePlaceAddress"`
+	DeliveryLandmark           string  `json:"DeliveryLandmark,omitempty"`
+	ProductAmount              float64 `json:"ProductAmount,omitempty"`
 }
 
 type BookOrderRequest struct {
-	OrderRef               string        `json:"OrderRef"` // unique UUID — prevents duplicate bookings
-	CompanyID               uint          `json:"CompanyID"`
-	PaymentMode             string        `json:"PaymentMode"`
-	Vehicle                 string        `json:"Vehicle"`
-	PickUpContactName       string        `json:"PickUpContactName"`
-	PickUpContactNumber     string        `json:"PickUpContactNumber"`
-	PickUpGooglePlaceAddress string       `json:"PickUpGooglePlaceAddress"`
-	PickUpLandmark           string       `json:"PickUpLandmark,omitempty"`
-	PickUpRequestedDate      string       `json:"PickUpRequestedDate"`
-	PickUpRequestedTime      string       `json:"PickUpRequestedTime"`
-	DeliveryRequestedTime    string       `json:"DeliveryRequestedTime"`
-	DeliveryTimeline         string       `json:"DeliveryTimeline"` // "sameDay" | "nextDay" | "beyondNextDay"
-	Packages                 []BookPackage `json:"Packages"`
+	OrderRef                 string `json:"OrderRef"` // unique UUID — prevents duplicate bookings
+	CompanyID                uint   `json:"CompanyID"`
+	PaymentMode              string `json:"PaymentMode"`
+	Vehicle                  string `json:"Vehicle"`
+	PickUpContactName        string `json:"PickUpContactName"`
+	PickUpContactNumber      string `json:"PickUpContactNumber"`
+	PickUpGooglePlaceAddress string `json:"PickUpGooglePlaceAddress"`
+	PickUpLandmark           string `json:"PickUpLandmark,omitempty"`
+	// IsProductOrder tells Dellyman to collect payment for the goods from the
+	// receiver on delivery (COD). Our buyers already pay upfront at checkout
+	// (Paystack/Flutterwave/bank transfer), so this must stay 0 — otherwise
+	// Dellyman would attempt to double-charge the buyer at the door.
+	IsProductOrder        *int          `json:"IsProductOrder,omitempty"`
+	IsInstantDelivery     *int          `json:"IsInstantDelivery,omitempty"`
+	PickUpRequestedDate   string        `json:"PickUpRequestedDate"`
+	PickUpRequestedTime   string        `json:"PickUpRequestedTime"`
+	DeliveryRequestedTime string        `json:"DeliveryRequestedTime"`
+	DeliveryTimeline      string        `json:"DeliveryTimeline"` // "sameDay" | "nextDay" | "beyondNextDay"
+	Packages              []BookPackage `json:"Packages"`
 }
 
 type BookPackageResult struct {
@@ -171,7 +177,7 @@ type BookPackageResult struct {
 
 type BookOrderResponse struct {
 	ResponseCode int                 `json:"ResponseCode"`
-	Message      string              `json:"Message"`
+	Message      string              `json:"ResponseMessage"`
 	OrderID      uint                `json:"OrderID"`
 	OrderCode    string              `json:"OrderCode"`
 	TrackingID   string              `json:"TrackingID"`
@@ -191,61 +197,67 @@ func BookOrder(req BookOrderRequest) (*BookOrderResponse, error) {
 
 // ── Order lookup / tracking ───────────────────────────────────────────────
 
+// DellymanOrderStatus mirrors the raw GetOrder/TrackOrder response — unlike
+// GetQuotes/BookOrder, these endpoints return the order fields directly at
+// the top level (no ResponseCode/Data wrapper), and OrderID/OrderPrice come
+// back as JSON strings, not numbers.
 type DellymanOrderStatus struct {
-	OrderID     uint   `json:"OrderID"`
+	OrderID     string `json:"OrderID"`
 	OrderCode   string `json:"OrderCode"`
 	TrackingID  string `json:"TrackingID"`
 	OrderStatus string `json:"OrderStatus"`
-	OrderPrice  float64 `json:"OrderPrice"`
+	OrderPrice  string `json:"OrderPrice"`
 	PickedUpAt  string `json:"PickedUpAt,omitempty"`
 	DeliveredAt string `json:"DeliveredAt,omitempty"`
 }
 
-type getOrderResponse struct {
-	ResponseCode int                 `json:"ResponseCode"`
-	Message      string              `json:"Message"`
-	Order        DellymanOrderStatus `json:"Order"`
-}
-
 func GetOrder(orderID uint) (*DellymanOrderStatus, error) {
-	var out getOrderResponse
+	var out DellymanOrderStatus
 	if err := dellymanRequest(http.MethodPost, "/GetOrder", map[string]uint{"OrderID": orderID}, &out); err != nil {
 		return nil, err
 	}
-	if out.ResponseCode != 100 {
-		return nil, fmt.Errorf("Dellyman error: %s", out.Message)
-	}
-	return &out.Order, nil
+	return &out, nil
 }
 
 func TrackOrder(trackingID string) (*DellymanOrderStatus, error) {
-	var out getOrderResponse
+	var out DellymanOrderStatus
 	if err := dellymanRequest(http.MethodPost, "/TrackOrder", map[string]string{"TrackingID": trackingID}, &out); err != nil {
 		return nil, err
 	}
-	if out.ResponseCode != 100 {
-		return nil, fmt.Errorf("Dellyman error: %s", out.Message)
-	}
-	return &out.Order, nil
+	return &out, nil
 }
+
+// ── Cancellation ─────────────────────────────────────────────────────────
+//
+// Dellyman confirmed directly (2026-07-30) that there is no API to cancel an
+// already-booked order — every plausible endpoint (/CancelOrder,
+// /CancelBooking, /CancelOrders, /DeleteOrder, /Order/Cancel) 404s, and
+// that's expected, not a bug on our side. A booked/picked shipment that gets
+// cancelled on BLVCKMRKT is instead flagged for a human to cancel by hand in
+// the Dellyman dashboard — see cancelDellymanDeliveriesForOrder in
+// handlers/dellyman.go, which emails ops the order/tracking details needed
+// to do that.
 
 // ── Webhooks ───────────────────────────────────────────────────────────────
 
 // WebhookPayload mirrors the documented Order.* event body Dellyman POSTs to
-// our callback URL (Order.created/picked/delivered/cancelled).
+// our callback URL (Order.created/picked/delivered/cancelled). "status" is a
+// JSON boolean on the wire, and — matching the same quirk seen on
+// GetOrder/TrackOrder — OrderID/OrderPrice/PackageID come back as strings,
+// not numbers.
 type WebhookPayload struct {
-	Status  string `json:"status"`
+	Status  bool   `json:"status"`
 	Message string `json:"message"`
 	Order   struct {
-		OrderID     uint    `json:"OrderID"`
-		OrderCode   string  `json:"OrderCode"`
-		TrackingID  string  `json:"TrackingID"`
-		OrderStatus string  `json:"OrderStatus"`
-		OrderPrice  float64 `json:"OrderPrice"`
-		PickedUpAt  string  `json:"PickedUpAt,omitempty"`
-		DeliveredAt string  `json:"DeliveredAt,omitempty"`
+		OrderID     string `json:"OrderID"`
+		OrderCode   string `json:"OrderCode"`
+		TrackingID  string `json:"TrackingID"`
+		OrderStatus string `json:"OrderStatus"`
+		OrderPrice  string `json:"OrderPrice"`
+		PickedUpAt  string `json:"PickedUpAt,omitempty"`
+		DeliveredAt string `json:"DeliveredAt,omitempty"`
 		Packages    []struct {
-			PackageID     uint   `json:"PackageID"`
+			PackageID     string `json:"PackageID"`
 			PackageStatus string `json:"PackageStatus"`
 		} `json:"Packages"`
 	} `json:"order"`

@@ -302,10 +302,11 @@ func BrandOverview(c *gin.Context) {
 	// so buyers hit "This brand hasn't set up shipping yet" and can't
 	// checkout from them) instead of leaving the brand to discover it later.
 	// ──────────────────────────────────────────────────────────────────────────
-	var shippingMethodCount, localRateCount, pickupCount int64
+	var shippingMethodCount, localRateCount, pickupCount, dellymanPickupCount int64
 	database.DB.Model(&models.ShippingMethod{}).Where("brand_id = ?", brand.ID).Count(&shippingMethodCount)
 	database.DB.Model(&models.LocalShippingRate{}).Where("brand_id = ?", brand.ID).Count(&localRateCount)
 	database.DB.Model(&models.PickupLocation{}).Where("brand_id = ?", brand.ID).Count(&pickupCount)
+	database.DB.Model(&models.Address{}).Where("user_id = ? AND is_dellyman_pickup = ?", brand.UserID, true).Count(&dellymanPickupCount)
 	hasShipping := shippingMethodCount > 0 || localRateCount > 0 || pickupCount > 0
 
 	var bankAccountCount int64
@@ -319,14 +320,15 @@ func BrandOverview(c *gin.Context) {
 		"partnership_signed": brand.PartnershipSigned,
 		"complete":           hasShipping && bankAccountCount > 0 && brand.LogoURL != "" && productCount > 0 && brand.PartnershipSigned,
 
-		// Split out separately from has_shipping: a pickup location is
-		// required regardless of delivery mode (Dellyman needs a collection
-		// address; buyer self-pickup needs one too), and a brand can satisfy
-		// has_shipping via pickup alone while still never having configured
-		// their own delivery plan (zones/local rates) — the two need
-		// independent nudges on the dashboard.
-		"has_pickup":        pickupCount > 0,
-		"has_delivery_plan": shippingMethodCount > 0 || localRateCount > 0,
+		// has_pickup is the buyer-facing self-collect option — optional, and
+		// unrelated to Dellyman. has_dellyman_pickup_address is the address
+		// Dellyman collects orders from (set on the brand's Addresses page),
+		// which IS required whenever the platform delivery mode is Dellyman.
+		// has_delivery_plan covers brand-handled shipping (zones/local rates),
+		// which the platform falls back to when delivery mode isn't Dellyman.
+		"has_pickup":                  pickupCount > 0,
+		"has_dellyman_pickup_address": dellymanPickupCount > 0,
+		"has_delivery_plan":           shippingMethodCount > 0 || localRateCount > 0,
 	}
 
 	// ──────────────────────────────────────────────────────────────────────────

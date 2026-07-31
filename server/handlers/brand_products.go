@@ -131,6 +131,7 @@ func BrandCreateProduct(c *gin.Context) {
 		Description  string  `json:"description"`
 		Price        float64 `json:"price"        binding:"required,min=0"`
 		ComparePrice float64 `json:"compare_price"` // ignored - calculated server-side
+		Weight       float64 `json:"weight"       binding:"required,gt=0"`
 		CategoryID   *uint   `json:"category_id"`
 		Status       string  `json:"status"`
 		IsFeatured   bool    `json:"is_featured"`
@@ -145,7 +146,7 @@ func BrandCreateProduct(c *gin.Context) {
 		} `json:"sizes"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		utils.BadRequest(c, "name and price are required", nil)
+		utils.BadRequest(c, "name, price and weight (kg) are required", nil)
 		return
 	}
 
@@ -170,6 +171,7 @@ func BrandCreateProduct(c *gin.Context) {
 		BrandPrice:   brandPrice,   // source of truth
 		Price:        displayPrice, // recalculated on every commission_rate change
 		ComparePrice: comparePrice, // brand's original ask (shown slashed)
+		Weight:       req.Weight,
 		Status:       status,
 		IsFeatured:   req.IsFeatured,
 		Tags:         req.Tags,
@@ -233,6 +235,7 @@ func BrandUpdateProduct(c *gin.Context) {
 		Description  string  `json:"description"`
 		Price        float64 `json:"price"` // brand's asking price
 		ComparePrice float64 `json:"compare_price"` // ignored - server-side only
+		Weight       float64 `json:"weight"`
 		CategoryID   *uint   `json:"category_id"`
 		Status       string  `json:"status"`
 		IsFeatured   *bool   `json:"is_featured"`
@@ -279,6 +282,9 @@ func BrandUpdateProduct(c *gin.Context) {
 	}
 	if req.Tags != "" {
 		updates["tags"] = req.Tags
+	}
+	if req.Weight > 0 {
+		updates["weight"] = req.Weight
 	}
 
 	database.DB.Model(&product).Updates(updates)

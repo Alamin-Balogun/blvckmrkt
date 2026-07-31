@@ -128,6 +128,7 @@ func AdminCreateProduct(c *gin.Context) {
 		Description  string  `json:"description"`
 		Price        float64 `json:"price"         binding:"required"`
 		ComparePrice float64 `json:"compare_price"`
+		Weight       float64 `json:"weight"`
 		CategoryID   *uint   `json:"category_id"`
 		Tags         string  `json:"tags"`
 		IsFeatured   bool    `json:"is_featured"`
@@ -158,6 +159,11 @@ func AdminCreateProduct(c *gin.Context) {
 		slug = fmt.Sprintf("%s-%d", base, i)
 	}
 
+	weight := req.Weight
+	if weight <= 0 {
+		weight = 2 // matches the column default for pre-existing products
+	}
+
 	product := models.Product{
 		BrandID:      req.BrandID,
 		UserID:       brand.UserID,
@@ -166,6 +172,7 @@ func AdminCreateProduct(c *gin.Context) {
 		Description:  req.Description,
 		Price:        req.Price,
 		ComparePrice: req.ComparePrice,
+		Weight:       weight,
 		CategoryID:   req.CategoryID,
 		Tags:         req.Tags,
 		IsFeatured:   req.IsFeatured,
@@ -206,6 +213,7 @@ func AdminUpdateProduct(c *gin.Context) {
 		Description  string  `json:"description"`
 		Price        float64 `json:"price"`
 		ComparePrice float64 `json:"compare_price"`
+		Weight       float64 `json:"weight"`
 		Status       string  `json:"status"`
 		IsFeatured   *bool   `json:"is_featured"`
 		Tags         string  `json:"tags"`
@@ -225,6 +233,7 @@ func AdminUpdateProduct(c *gin.Context) {
 	if req.Description != ""  { updates["description"]   = req.Description }
 	if req.Price > 0          { updates["price"]         = req.Price }
 	if req.ComparePrice > 0   { updates["compare_price"] = req.ComparePrice }
+	if req.Weight > 0         { updates["weight"]        = req.Weight }
 	if req.Status != ""       { updates["status"]        = req.Status }
 	if req.IsFeatured != nil  { updates["is_featured"]   = *req.IsFeatured }
 	if req.Tags != ""         { updates["tags"]          = req.Tags }

@@ -599,6 +599,7 @@ const extractLocationFromMethod = useCallback((method) => {
   // price was set — mirrors the server's itemTax() in create_order.go.
   const tax = Math.max(0, (product.compare_price || 0) - product.price) * qty;
   const orderTotal = itemTotal + deliveryCost + tax;
+  const totalWeight = (product.weight || 2) * qty;
 
   // ✅ NEW: Payment timeout (1 minute auto-close)
   useEffect(() => {
@@ -2735,6 +2736,13 @@ val: selectedShippingMethod ? (
                         </span>
                       </div>
                     )}
+                    <div
+                      style={{display: "flex", justifyContent: "space-between", marginBottom: 8}}>
+                      <span style={{color: "rgba(255,255,255,0.4)", fontSize: 12}}>Weight</span>
+                      <span style={{color: "rgba(255,255,255,0.7)", fontSize: 12, fontWeight: 700}}>
+                        {totalWeight.toFixed(1)} kg
+                      </span>
+                    </div>
                     {product.compare_price > 0 && product.compare_price !== product.price && (
                       <div
                         style={{display: "flex", justifyContent: "space-between", marginBottom: 8}}>
@@ -4488,6 +4496,9 @@ export default function BrandShop({currentBrandId}) {
                                 lineHeight: 1.1,
                               }}>
                               {fmtMoney(p.price)}
+                            </p>
+                            <p style={{color: "rgba(255,255,255,0.25)", fontSize: 9, margin: "2px 0 0"}}>
+                              {(p.weight || 2).toFixed(1)} kg
                             </p>
                           </div>
                           <button

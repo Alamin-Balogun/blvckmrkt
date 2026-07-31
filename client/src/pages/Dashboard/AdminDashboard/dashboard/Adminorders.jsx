@@ -14,6 +14,7 @@ import {
   getUsers,
   getProducts,
   getAdminPickupLocations,
+  sendReceiptEmail,
 } from "../dashboard/dashboard_components/api";
 import {AdminTable, Badge, SearchBar, ConfirmModal} from "./Components";
 
@@ -65,63 +66,73 @@ function buildReceiptHTML(order, buyer, address, items) {
 <meta charset="UTF-8">
 <title>Receipt — ${esc(order?.display_id)}</title>
 <style>
-  @media print { .no-print { display: none !important; } }
-  body { font-family: -apple-system, system-ui, sans-serif; background: #fafafa; color: #111; margin: 0; padding: 40px; }
-  .sheet { max-width: 640px; margin: 0 auto; background: #fff; border: 1px solid #e5e5e5; border-radius: 12px; padding: 40px; }
-  .brand { font-size: 22px; font-weight: 900; letter-spacing: 0.04em; }
+  @media print { .no-print { display: none !important; } body { background: #0a0a0a !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, system-ui, sans-serif; background: #0a0a0a; color: #fff; margin: 0; padding: 40px 20px; }
+  .sheet { max-width: 620px; margin: 0 auto; background: #111; border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; overflow: hidden; }
+  .head { background: #0d0d0d; padding: 28px 36px; border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; justify-content: space-between; align-items: center; }
+  .brand { font-family: Georgia, serif; font-size: 22px; font-weight: 900; letter-spacing: 0.04em; }
   .brand span { color: #ef4444; }
-  table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-  th { text-align: left; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: #888; padding-bottom: 8px; border-bottom: 2px solid #111; }
+  .body-pad { padding: 32px 36px 36px; }
+  .eyebrow { color: rgba(255,255,255,0.35); font-size: 10px; font-weight: 700; letter-spacing: 0.25em; text-transform: uppercase; margin: 0 0 4px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+  th { text-align: left; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255,255,255,0.35); padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); }
   th:nth-child(2) { text-align: center; } th:nth-child(3), th:nth-child(4) { text-align: right; }
+  td { color: rgba(255,255,255,0.8); }
 </style>
 </head>
 <body onload="window.print()">
   <div class="sheet">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;">
-      <div class="brand">BLVCK<span>MRKT</span></div>
+    <div class="head">
+      <img src="https://blvckmrktng.com/logo.png" alt="BLVCKMRKT" style="height:32px;width:auto;display:block;" />
       <div style="text-align:right;">
-        <p style="margin:0;font-weight:700;font-size:14px;">RECEIPT</p>
-        <p style="margin:2px 0 0;color:#888;font-size:12px;">${esc(order?.display_id)}</p>
+        <p style="margin:0;font-weight:900;font-size:13px;letter-spacing:0.15em;color:#ef4444;text-transform:uppercase;">Receipt</p>
+        <p style="margin:2px 0 0;color:rgba(255,255,255,0.4);font-size:11px;font-family:monospace;">${esc(order?.display_id)}</p>
       </div>
     </div>
 
-    <div style="display:flex;justify-content:space-between;gap:24px;margin-bottom:8px;font-size:12px;color:#555;">
-      <div>
-        <p style="margin:0 0 4px;color:#888;text-transform:uppercase;font-size:10px;letter-spacing:0.1em;">Billed To</p>
-        <p style="margin:0;font-weight:600;color:#111;">${esc(buyer?.name)}</p>
-        <p style="margin:2px 0;">${esc(buyer?.email)}</p>
-        <p style="margin:2px 0;">${addressBlock}</p>
+    <div class="body-pad">
+      <div style="display:flex;justify-content:space-between;gap:24px;margin-bottom:8px;font-size:12px;">
+        <div>
+          <p class="eyebrow">Billed To</p>
+          <p style="margin:0;font-weight:700;color:#fff;font-size:13px;">${esc(buyer?.name)}</p>
+          <p style="margin:2px 0;color:rgba(255,255,255,0.5);">${esc(buyer?.email)}</p>
+          <p style="margin:2px 0;color:rgba(255,255,255,0.5);max-width:220px;">${addressBlock}</p>
+        </div>
+        <div style="text-align:right;">
+          <p class="eyebrow">Date</p>
+          <p style="margin:0;color:rgba(255,255,255,0.7);">${order?.created_at ? new Date(order.created_at).toLocaleDateString() : "—"}</p>
+          <p class="eyebrow" style="margin-top:10px;">Payment</p>
+          <p style="margin:0;color:rgba(255,255,255,0.7);text-transform:capitalize;">${esc(order?.payment_method)} · ${esc(order?.payment_status)}</p>
+        </div>
       </div>
-      <div style="text-align:right;">
-        <p style="margin:0 0 4px;color:#888;text-transform:uppercase;font-size:10px;letter-spacing:0.1em;">Date</p>
-        <p style="margin:0;">${order?.created_at ? new Date(order.created_at).toLocaleDateString() : "—"}</p>
-        <p style="margin:8px 0 4px;color:#888;text-transform:uppercase;font-size:10px;letter-spacing:0.1em;">Payment</p>
-        <p style="margin:0;">${esc(order?.payment_method)} · ${esc(order?.payment_status)}</p>
+
+      <table>
+        <thead><tr><th>Item</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+
+      <div style="margin-top:20px;display:flex;justify-content:flex-end;">
+        <div style="width:230px;background:#0a0a0a;border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:16px 18px;">
+          <div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;">
+            <span style="color:rgba(255,255,255,0.4);">Subtotal</span><span style="color:rgba(255,255,255,0.75);">${money(order?.subtotal)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;">
+            <span style="color:rgba(255,255,255,0.4);">Tax</span><span style="color:rgba(255,255,255,0.75);">${money(order?.tax)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;">
+            <span style="color:rgba(255,255,255,0.4);">Shipping</span><span style="color:rgba(255,255,255,0.75);">${money(order?.shipping_fee)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding-top:10px;margin-top:8px;border-top:1px solid rgba(255,255,255,0.1);font-weight:900;font-size:15px;">
+            <span style="color:#fff;">Total</span><span style="color:#ef4444;">${money(order?.total)}</span>
+          </div>
+        </div>
       </div>
+
+      <p style="margin-top:32px;text-align:center;color:rgba(255,255,255,0.25);font-size:11px;">
+        Receipt issued by BLVCKMRKT admin · ${new Date().toLocaleDateString()}
+      </p>
     </div>
-
-    <table>
-      <thead><tr><th>Item</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr></thead>
-      <tbody>${rows}</tbody>
-    </table>
-
-    <div style="margin-top:20px;display:flex;justify-content:flex-end;">
-      <div style="width:220px;">
-        <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;">
-          <span style="color:#888;">Subtotal</span><span>${money(order?.subtotal)}</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;">
-          <span style="color:#888;">Shipping</span><span>${money(order?.shipping_fee)}</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;padding:8px 0;margin-top:4px;border-top:2px solid #111;font-weight:900;font-size:16px;">
-          <span>Total</span><span>${money(order?.total)}</span>
-        </div>
-      </div>
-    </div>
-
-    <p style="margin-top:36px;text-align:center;color:#aaa;font-size:11px;">
-      Receipt issued by BLVCKMRKT admin · ${new Date().toLocaleDateString()}
-    </p>
   </div>
   <div class="no-print" style="text-align:center;margin-top:16px;">
     <button onclick="window.print()" style="padding:10px 20px;border-radius:8px;border:none;background:#ef4444;color:#fff;font-weight:700;cursor:pointer;">
@@ -1091,6 +1102,7 @@ function OrderDrawer({orderId, onClose, onStatusChange, onPaymentStatusChange, o
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
+  const [sendingReceipt, setSendingReceipt] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -1108,6 +1120,7 @@ function OrderDrawer({orderId, onClose, onStatusChange, onPaymentStatusChange, o
   const address = data?.address;
   const items = order?.items || order?.Items || [];
   const deliveryDetails = data?.delivery_details;
+  const dellymanDeliveries = data?.dellyman_deliveries || [];
   const paymentDetails = data?.payment_details;
 
   const handleStatus = async (status) => {
@@ -1122,6 +1135,18 @@ function OrderDrawer({orderId, onClose, onStatusChange, onPaymentStatusChange, o
     await onPaymentStatusChange(orderId, payment_status);
     setData((prev) => (prev ? {...prev, order: {...prev.order, payment_status}} : prev));
     setUpdating(false);
+  };
+
+  const handleSendReceipt = async () => {
+    setSendingReceipt(true);
+    try {
+      const res = await sendReceiptEmail(orderId);
+      toast.success("Receipt Sent", res?.message || "Receipt emailed to the buyer");
+    } catch (err) {
+      toast.error("Send Failed", err.message || "Could not email the receipt");
+    } finally {
+      setSendingReceipt(false);
+    }
   };
 
   return (
@@ -1182,6 +1207,21 @@ function OrderDrawer({orderId, onClose, onStatusChange, onPaymentStatusChange, o
                 🧾 Receipt
               </button>
             )}
+            {!loading && order && (
+              <button
+                onClick={handleSendReceipt}
+                disabled={sendingReceipt}
+                title="Email receipt to buyer"
+                style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  height: 30, padding: "0 12px", borderRadius: 7,
+                  background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.25)",
+                  cursor: sendingReceipt ? "default" : "pointer", color: "#22c55e", fontSize: 11, fontWeight: 700,
+                  opacity: sendingReceipt ? 0.6 : 1,
+                }}>
+                {sendingReceipt ? "Sending…" : "✉️ Email Receipt"}
+              </button>
+            )}
             <button
               onClick={onClose}
               style={{
@@ -1223,9 +1263,10 @@ function OrderDrawer({orderId, onClose, onStatusChange, onPaymentStatusChange, o
 
             {/* Financials */}
             <SectionHeader style={{marginTop: 0}}>Financials</SectionHeader>
-            <div style={{display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 18}}>
+            <div style={{display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, marginBottom: 18}}>
               {[
                 {label: "Subtotal", val: `₦${Number(order?.subtotal || 0).toLocaleString()}`},
+                {label: "Tax", val: `₦${Number(order?.tax || 0).toLocaleString()}`},
                 {label: "Shipping", val: `₦${Number(order?.shipping_fee || 0).toLocaleString()}`},
                 {label: "Total", val: `₦${Number(order?.total || 0).toLocaleString()}`, highlight: true},
               ].map(({label, val, highlight}) => (
@@ -1304,6 +1345,45 @@ function OrderDrawer({orderId, onClose, onStatusChange, onPaymentStatusChange, o
                     </>
                   )}
                 </div>
+              </>
+            )}
+
+            {/* Dellyman Delivery Details */}
+            {dellymanDeliveries.length > 0 && (
+              <>
+                <SectionHeader>Dellyman Delivery {dellymanDeliveries.length > 1 ? `(${dellymanDeliveries.length} brands)` : ""}</SectionHeader>
+                {dellymanDeliveries.map((d, i) => (
+                  <div key={d.brand_id || i} style={{
+                    background: "rgba(139,92,246,0.05)", border: "1px solid rgba(139,92,246,0.15)",
+                    borderRadius: 9, padding: "12px 14px", marginBottom: 10,
+                  }}>
+                    <div style={{display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6}}>
+                      <span style={{color: "#a78bfa", fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.06em"}}>
+                        {d.brand_name || `Brand #${d.brand_id}`}
+                      </span>
+                      <Badge
+                        label={d.status || "quoted"}
+                        color={{quoted: "#6b7280", booked: "#3b82f6", picked: "#06b6d4", delivered: "#22c55e", cancelled: "#ef4444", failed: "#ef4444"}[d.status] || "#6b7280"}
+                      />
+                    </div>
+                    <SectionHeader style={{margin: "6px 0 2px"}}>Brand</SectionHeader>
+                    <InfoRow label="Email" value={d.brand_email} />
+                    <InfoRow label="Pickup Address" value={d.pickup_address} />
+                    <SectionHeader style={{margin: "10px 0 2px"}}>Buyer / Drop-off</SectionHeader>
+                    <InfoRow label="Contact Name" value={d.delivery_contact_name} />
+                    <InfoRow label="Contact Phone" value={d.delivery_contact_phone} />
+                    <InfoRow label="Address" value={d.delivery_address} />
+                    {d.delivery_landmark && <InfoRow label="Landmark" value={d.delivery_landmark} />}
+                    <SectionHeader style={{margin: "10px 0 2px"}}>Courier</SectionHeader>
+                    <InfoRow label="Company" value={d.courier_company} />
+                    <InfoRow label="Vehicle" value={d.vehicle} />
+                    <InfoRow label="Price" value={`${d.currency === "NGN" ? "₦" : d.currency || ""}${Number(d.price || 0).toLocaleString()}`} />
+                    <InfoRow label="Dellyman Order ID" value={d.dellyman_order_id} />
+                    <InfoRow label="Tracking ID" value={d.tracking_id} />
+                    {d.picked_up_at && <InfoRow label="Picked Up" value={fmtDate(d.picked_up_at, true)} />}
+                    {d.delivered_at && <InfoRow label="Delivered" value={fmtDate(d.delivered_at, true)} />}
+                  </div>
+                ))}
               </>
             )}
 

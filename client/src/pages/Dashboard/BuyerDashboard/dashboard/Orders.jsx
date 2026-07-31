@@ -10,6 +10,80 @@ const STATUS_MAP = {
   refunded: {label: "Refunded", color: "rgba(255,255,255,0.4)", bg: "rgba(255,255,255,0.06)"},
 };
 
+// Per-brand courier (Dellyman) shipment status — separate from the overall
+// order status above, since one order can have multiple brands' shipments
+// each moving through the courier's pipeline independently.
+const DELIVERY_STATUS_MAP = {
+  quoted: {label: "Preparing Shipment", color: "#f59e0b", bg: "rgba(245,158,11,0.1)"},
+  booked: {label: "Courier Booked", color: "#3b82f6", bg: "rgba(59,130,246,0.1)"},
+  picked: {label: "Out For Delivery", color: "#a855f7", bg: "rgba(168,85,247,0.1)"},
+  delivered: {label: "Delivered", color: "#22c55e", bg: "rgba(34,197,94,0.1)"},
+  cancelled: {label: "Delivery Cancelled", color: "#ef4444", bg: "rgba(239,68,68,0.1)"},
+  failed: {label: "Delivery Issue", color: "#ef4444", bg: "rgba(239,68,68,0.1)"},
+};
+
+// ── Delivery Status panel ────────────────────────────────────────────────
+function DeliveryStatusPanel({deliveryStatus}) {
+  if (!Array.isArray(deliveryStatus) || deliveryStatus.length === 0) return null;
+  return (
+    <div style={{display: "flex", flexDirection: "column", gap: 8}}>
+      <p
+        style={{
+          color: "rgba(255,255,255,0.25)",
+          fontSize: 9,
+          fontWeight: 700,
+          letterSpacing: "0.18em",
+          textTransform: "uppercase",
+          margin: 0,
+        }}>
+        Delivery Status
+      </p>
+      {deliveryStatus.map((d, i) => {
+        const s = DELIVERY_STATUS_MAP[d.status] || DELIVERY_STATUS_MAP.quoted;
+        return (
+          <div
+            key={i}
+            style={{
+              background: "rgba(255,255,255,0.03)",
+              borderRadius: 8,
+              padding: "10px 14px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 10,
+              flexWrap: "wrap",
+            }}>
+            <div>
+              {d.company_name && (
+                <p style={{color: "rgba(255,255,255,0.5)", fontSize: 11, margin: "0 0 2px"}}>
+                  {d.company_name}
+                </p>
+              )}
+              {d.tracking_id && (
+                <p style={{color: "rgba(255,255,255,0.25)", fontSize: 10, margin: 0}}>
+                  Tracking ID: {d.tracking_id}
+                </p>
+              )}
+            </div>
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                color: s.color,
+                background: s.bg,
+                padding: "4px 10px",
+                borderRadius: 99,
+                whiteSpace: "nowrap",
+              }}>
+              {s.label}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function Skeleton() {
   return (
     <div
@@ -317,7 +391,9 @@ export default function Orders() {
     setCancelling(id);
     try {
       await cancelOrder(id);
-      setOrders((prev) => prev.map((o) => (o.id === id ? {...o, status: "cancelled"} : o)));
+      setOrders((prev) =>
+        prev.map((o) => (o.id === id ? {...o, status: "cancelled", can_cancel: false} : o)),
+      );
     } catch (e) {
       alert(e.message);
     } finally {
@@ -402,7 +478,9 @@ export default function Orders() {
           orders.map((o) => {
             const s = STATUS_MAP[o.status] || STATUS_MAP.pending;
             const isExpanded = expanded === o.id;
-            const canCancel = o.status === "pending" || o.status === "processing";
+            const canCancel = !!o.can_cancel;
+            const stillCancellableStatus = o.status === "pending" || o.status === "processing";
+            const windowPassed = stillCancellableStatus && !canCancel;
             return (
               <div
                 key={o.id}
@@ -638,6 +716,9 @@ export default function Orders() {
                     */}
                     <BrandContactPanel order={o} />
 
+                    {/* Delivery / tracking status */}
+                    <DeliveryStatusPanel deliveryStatus={o.delivery_status} />
+
                     {/* Delivery address */}
                     {o.address && (
                       <div
@@ -703,6 +784,11 @@ export default function Orders() {
                         }}>
                         {cancelling === o.id ? "Cancelling..." : "Cancel Order"}
                       </button>
+                    )}
+                    {windowPassed && (
+                      <p style={{color: "rgba(255,255,255,0.25)", fontSize: 10, margin: 0}}>
+                        The 3-day cancellation window for this order has passed.
+                      </p>
                     )}
                   </div>
                 )}

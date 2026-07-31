@@ -413,9 +413,10 @@ export default function BrandsPage() {
   const dropsAvailLabel = useBrandsContent("drops_avail_label", "products available");
 
   useEffect(() => {
-    // GET /api/brands already only returns verified brands — no further
-    // filtering needed here (the subscription feature this used to also
-    // check for has been removed).
+    // GET /api/brands returns every non-deleted brand, verified or still
+    // pending review — StatusBadge below shows the "pending" tag for the
+    // latter. Their products stay hidden site-wide until verified (enforced
+    // server-side in shop.go), but the brand itself is still browsable.
     fetchBrands().then((data) => {
       setBrands(data);
       setLoading(false);
@@ -443,8 +444,10 @@ export default function BrandsPage() {
 
   // Featured = admin-pinned via Brand.FeaturedRank (admin brand drawer).
   // Excludes exclusive brands so they don't appear in two sections at once.
+  // Featured brands still also appear in the All Brands grid below — only
+  // exclusive brands (a separate, always-pulled-out section) are excluded.
   const featured = filtered.filter((b) => !b.is_exclusive && b.featured_rank != null);
-  const rest = filtered.filter((b) => !b.is_exclusive && b.featured_rank == null);
+  const rest = filtered.filter((b) => !b.is_exclusive);
 
   return (
     <section
@@ -625,7 +628,7 @@ export default function BrandsPage() {
                 </>
               )}
 
-              {/* ── Featured Brands (admin-controlled — shows when brands have active subscription) ── */}
+              {/* ── Featured Brands (admin-pinned via Brand.FeaturedRank) ── */}
               {featured.length > 0 && (
                 <>
                   <div className="brands-divider">

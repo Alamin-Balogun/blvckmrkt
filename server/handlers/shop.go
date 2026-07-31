@@ -25,6 +25,7 @@ type ProductSummary struct {
 	BrandPrice   float64              `json:"brand_price,omitempty"`
 	Price        float64              `json:"price"`
 	ComparePrice float64              `json:"compare_price,omitempty"`
+	Weight       float64              `json:"weight"`
 	Tags         string               `json:"tags,omitempty"`
 	BrandID      uint                 `json:"brand_id"`
 	BrandName    string               `json:"brand_name"`
@@ -68,6 +69,7 @@ func fetchProductSummaries(productIDs []uint) map[uint]ProductSummary {
 		result[p.ID] = ProductSummary{
 			ID: p.ID, Name: p.Name, Slug: p.Slug,
 			BrandPrice: p.BrandPrice, Price: p.Price, ComparePrice: p.ComparePrice,
+			Weight: p.Weight,
 			Tags: p.Tags, BrandID: p.BrandID, BrandName: brandMap[p.BrandID],
 			PrimaryImage: primaryImg, Sizes: p.Sizes,
 		}
@@ -92,6 +94,9 @@ func ListProducts(c *gin.Context) {
 		query = query.Where("products.brand_id IN ?", ids)
 	} else if brandID := c.Query("brand_id"); brandID != "" {
 		query = query.Where("products.brand_id = ?", brandID)
+	}
+	if ids := c.Query("ids"); ids != "" {
+		query = query.Where("products.id IN ?", strings.Split(ids, ","))
 	}
 	if catID := c.Query("category_id"); catID != "" {
 		query = query.Where("products.category_id = ?", catID)
@@ -166,6 +171,7 @@ func ListProducts(c *gin.Context) {
 		resp[i] = ProductSummary{
 			ID: p.ID, Name: p.Name, Slug: p.Slug,
 			BrandPrice: p.BrandPrice, Price: p.Price, ComparePrice: p.ComparePrice,
+			Weight: p.Weight,
 			Tags: p.Tags, BrandID: p.BrandID, BrandName: brandMap[p.BrandID],
 			PrimaryImage: primaryImg, Sizes: p.Sizes, CreatedAt: p.CreatedAt,
 		}
@@ -207,13 +213,14 @@ func GetProduct(c *gin.Context) {
 	}
 
 	// ── Verify the brand is eligible ──────────────────────────────────────
+	// Matches ListProducts' eligibility check exactly (verified, not deleted) —
+	// subscription status is intentionally NOT part of this, since the shop
+	// grid doesn't gate on it either. Keeping them in sync avoids products
+	// that show up in the grid 404ing when a buyer opens the detail page.
 	var brand models.Brand
 	database.DB.First(&brand, product.BrandID)
 
-	if brand.ID == 0 ||
-		brand.VerificationStatus != models.VerificationVerified ||
-		(brand.SubscriptionStatus != models.SubStatusActive &&
-			brand.SubscriptionStatus != models.SubStatusTrial) {
+	if brand.ID == 0 || brand.DeletedAt.Valid || brand.VerificationStatus != models.VerificationVerified {
 		utils.NotFound(c, "Product not found")
 		return
 	}
@@ -274,6 +281,7 @@ func GetProduct(c *gin.Context) {
 		"price":         product.Price,
 		"compare_price": product.ComparePrice,
 		"brand_price":   product.BrandPrice,
+		"weight":        product.Weight,
 		"status":        product.Status,
 		"is_featured":   product.IsFeatured,
 		"tags":          product.Tags,

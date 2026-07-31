@@ -11,42 +11,6 @@ const STATUS_MAP = {
   refunded: {label: "Refunded", color: "rgba(255,255,255,0.4)", bg: "rgba(255,255,255,0.06)"},
 };
 
-function buildSpendChart(orders) {
-  const months = [];
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date();
-    d.setMonth(d.getMonth() - i);
-    months.push({
-      label: d.toLocaleString("default", {month: "short"}),
-      month: d.getMonth(),
-      year: d.getFullYear(),
-      value: 0,
-    });
-  }
-  orders.forEach((o) => {
-    const d = new Date(o.created_at);
-    const b = months.find((m) => m.month === d.getMonth() && m.year === d.getFullYear());
-    if (b) b.value += o.total || 0;
-  });
-  const W = 400,
-    H = 120,
-    pad = {t: 10, r: 10, b: 24, l: 36};
-  const vals = months.map((m) => m.value);
-  const maxV = Math.max(...vals, 1);
-  const pts = months.map((m, i) => {
-    const x = pad.l + (i / (months.length - 1)) * (W - pad.l - pad.r);
-    const y = pad.t + (1 - m.value / maxV) * (H - pad.t - pad.b);
-    return [x, y];
-  });
-  const line = pts
-    .map((p, i) => (i === 0 ? "M" : "L") + p[0].toFixed(1) + "," + p[1].toFixed(1))
-    .join(" ");
-  const area =
-    line +
-    ` L${pts[pts.length - 1][0].toFixed(1)},${H - pad.b} L${pts[0][0].toFixed(1)},${H - pad.b} Z`;
-  return {months, maxV, pts, line, area};
-}
-
 function Skeleton({h = 14, w = "100%", r = 6}) {
   return (
     <div
@@ -145,8 +109,6 @@ export default function Overview({user, onNav}) {
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good Morning" : hour < 18 ? "Good Afternoon" : "Good Evening";
-  const totalSpent = orders.reduce((s, o) => s + (o.total || 0), 0);
-  const {months, maxV, pts, line, area} = buildSpendChart(orders);
   const newProducts = products.filter((p) => p.tags);
   const followCount = follows?.count ?? follows?.brands?.length ?? 0;
 
@@ -154,12 +116,10 @@ export default function Overview({user, onNav}) {
     <div style={{display: "flex", flexDirection: "column", gap: 18}}>
       <style>{`
         @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
-        .ov-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
-        .ov-mid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+        .ov-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+        .ov-mid{display:grid;grid-template-columns:1fr;gap:14px;}
         .ov-wishlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;}
-        @media(max-width:780px){.ov-stats{grid-template-columns:repeat(2,1fr)!important;}}
         @media(max-width:480px){.ov-stats{grid-template-columns:repeat(2,1fr)!important;}}
-        @media(max-width:700px){.ov-mid{grid-template-columns:1fr!important;}}
         @media(max-width:360px){.ov-stats{grid-template-columns:1fr!important;}}
       `}</style>
 
@@ -200,28 +160,6 @@ export default function Overview({user, onNav}) {
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
-              />
-            </svg>
-          }
-        />
-        <StatCard
-          label="Total Spent"
-          value={fmtMoney(totalSpent, "NGN")}
-          sub="all time"
-          accentRgb="59,130,246"
-          loading={loading}
-          icon={
-            <svg
-              width="15"
-              height="15"
-              fill="none"
-              stroke="#3b82f6"
-              strokeWidth="1.8"
-              viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
               />
             </svg>
           }
@@ -273,133 +211,6 @@ export default function Overview({user, onNav}) {
       </div>
 
       <div className="ov-mid">
-        {/* Spend chart */}
-        <div
-          style={{
-            background: "#0d0d0d",
-            border: "1px solid rgba(255,255,255,0.07)",
-            borderRadius: 14,
-            padding: "18px 20px",
-          }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              marginBottom: 14,
-            }}>
-            <div>
-              <p
-                style={{
-                  color: "rgba(255,255,255,0.3)",
-                  fontSize: 10,
-                  fontWeight: 700,
-                  letterSpacing: "0.18em",
-                  textTransform: "uppercase",
-                  margin: "0 0 3px",
-                }}>
-                Spending Activity
-              </p>
-              {loading ? (
-                <Skeleton h={28} w={80} />
-              ) : (
-                <p
-                  style={{
-                    fontFamily: "'Bebas Neue',sans-serif",
-                    fontSize: "1.6rem",
-                    color: "#fff",
-                    letterSpacing: "0.04em",
-                    margin: 0,
-                  }}>
-                  {fmtMoney(totalSpent, "NGN")}
-                </p>
-              )}
-            </div>
-            <span
-              style={{
-                background: "rgba(34,197,94,0.1)",
-                color: "#22c55e",
-                fontSize: 10,
-                fontWeight: 700,
-                padding: "3px 8px",
-                borderRadius: 99,
-              }}>
-              Last 6 months
-            </span>
-          </div>
-          {loading ? (
-            <Skeleton h={120} />
-          ) : (
-            <svg viewBox="0 0 400 120" style={{width: "100%", height: 120, overflow: "visible"}}>
-              <defs>
-                <linearGradient id="ag" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#ef4444" stopOpacity="0.22" />
-                  <stop offset="100%" stopColor="#ef4444" stopOpacity="0" />
-                </linearGradient>
-              </defs>
-              {[0, 0.5, 1].map((t) => {
-                const y = 10 + t * (120 - 10 - 24);
-                return (
-                  <line
-                    key={t}
-                    x1="36"
-                    y1={y}
-                    x2="390"
-                    y2={y}
-                    stroke="rgba(255,255,255,0.06)"
-                    strokeWidth="1"
-                    strokeDasharray="4,4"
-                  />
-                );
-              })}
-              <path d={area} fill="url(#ag)" />
-              <path
-                d={line}
-                fill="none"
-                stroke="#ef4444"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              {pts.map(([x, y], i) => (
-                <circle
-                  key={i}
-                  cx={x}
-                  cy={y}
-                  r="3.5"
-                  fill="#ef4444"
-                  stroke="#070707"
-                  strokeWidth="2"
-                />
-              ))}
-              {months.map((m, i) => {
-                const x = 36 + (i / (months.length - 1)) * (400 - 36 - 10);
-                return (
-                  <text
-                    key={i}
-                    x={x}
-                    y="118"
-                    textAnchor="middle"
-                    fill="rgba(255,255,255,0.25)"
-                    fontSize="9"
-                    fontFamily="system-ui">
-                    {m.label}
-                  </text>
-                );
-              })}
-              <text
-                x="32"
-                y="14"
-                textAnchor="end"
-                fill="rgba(255,255,255,0.25)"
-                fontSize="9"
-                fontFamily="system-ui">
-                {fmtMoney(maxV, "NGN")}
-              </text>
-            </svg>
-          )}
-        </div>
-
         {/* Recent Orders */}
         <div
           style={{

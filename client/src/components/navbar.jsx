@@ -1,17 +1,15 @@
 import {useState, useEffect, useRef} from "react";
 import {useCartWishlist} from "./cartcontext";
-import {Link, useLocation} from "react-router-dom";
+import {Link, useLocation, useNavigate} from "react-router-dom";
 import {motion, AnimatePresence} from "framer-motion";
 import logo from "../assets/logo.png";
 
 // ── CMS defaults — shown before/if API doesn't return values ─────────────────
 const DEFAULT_MARQUEE_ITEMS = [
   "NEW DROPS",
-  "FREE SHIPPING OVER ₦50,000",
   "SELLERS NOW ACCEPTED",
   "AUTHENTIC STREETWEAR ONLY",
   "NEW DROPS",
-  "FREE SHIPPING OVER $200",
   "SELLERS NOW ACCEPTED",
 ];
 
@@ -52,7 +50,18 @@ export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
   const moreRef = useRef(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const submitSearch = () => {
+    const q = searchQuery.trim();
+    if (!q) return;
+    navigate(`/shop?search=${encodeURIComponent(q)}`);
+    setSearchOpen(false);
+    setSearchQuery("");
+  };
 
   // ── CMS state ─────────────────────────────────────────────────────────────
   const [showBar, setShowBar] = useState(true);
@@ -215,6 +224,44 @@ export default function Navbar() {
 
           {/* Right Icons — desktop */}
           <div className="hidden md:flex items-center gap-6 ml-auto">
+            {/* Search */}
+            <div className="flex items-center">
+              <AnimatePresence>
+                {searchOpen && (
+                  <motion.input
+                    initial={{width: 0, opacity: 0}}
+                    animate={{width: 160, opacity: 1}}
+                    exit={{width: 0, opacity: 0}}
+                    transition={{duration: 0.2}}
+                    autoFocus
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && submitSearch()}
+                    onBlur={() => !searchQuery && setSearchOpen(false)}
+                    placeholder="Search products..."
+                    className="bg-transparent border-b border-white/20 text-white text-xs px-1 py-1 outline-none placeholder:text-white/30 mr-2"
+                  />
+                )}
+              </AnimatePresence>
+              <button
+                onClick={() => (searchOpen ? submitSearch() : setSearchOpen(true))}
+                className="text-white/60 hover:text-white transition-colors">
+                <svg
+                  width="18"
+                  height="18"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  />
+                </svg>
+              </button>
+            </div>
             {/* User/account icon moved to the front of the icon cluster */}
             <Link
               to="/signup"
@@ -357,6 +404,34 @@ export default function Navbar() {
                 </div>
               </div>
               <div className="flex flex-col items-center justify-center px-6 py-12 min-h-[calc(100vh-88px)]">
+                <div className="w-full max-w-xs mb-10 flex items-center gap-2 border-b border-white/15 pb-2">
+                  <svg
+                    width="16"
+                    height="16"
+                    fill="none"
+                    stroke="rgba(255,255,255,0.4)"
+                    strokeWidth="1.5"
+                    viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                    />
+                  </svg>
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        submitSearch();
+                        setMenuOpen(false);
+                      }
+                    }}
+                    placeholder="Search products..."
+                    className="flex-1 bg-transparent text-white text-sm outline-none placeholder:text-white/30"
+                  />
+                </div>
                 <div className="flex flex-col items-center gap-3 mb-8">
                   <span className="text-red-500 text-[9px] font-bold tracking-[0.3em] uppercase mb-2">
                     ✦ Navigation

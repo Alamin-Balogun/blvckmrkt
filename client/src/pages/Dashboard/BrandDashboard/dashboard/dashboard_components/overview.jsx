@@ -126,30 +126,32 @@ const deliveryBannerDotStyle = {
 
 // Pickup + delivery-plan reminders — independent of the general onboarding
 // checklist above, whose "has_shipping" is satisfied by pickup OR zones OR
-// local rates (any one). A pickup location is required no matter which
-// delivery mode the platform is in (Dellyman needs a collection address;
-// buyer self-pickup needs one too), so it gets its own always-on nudge here
-// even after the general checklist reports "complete".
+// local rates (any one). When the platform delivery mode is Dellyman, the
+// brand needs a dedicated Dellyman pickup address (set on the Addresses
+// page) so couriers know where to collect orders — this is separate from
+// PickupLocation, the optional buyer-facing self-collect option — so it
+// gets its own always-on nudge here even after the general checklist
+// reports "complete".
 function DeliverySetupBanner({onboarding, deliveryMode, onNav}) {
   if (!onboarding) return null;
 
-  const needsPickup = !onboarding.has_pickup;
+  const needsDellymanPickup = deliveryMode === "dellyman" && !onboarding.has_dellyman_pickup_address;
   const needsDeliveryPlan = deliveryMode !== "dellyman" && !onboarding.has_delivery_plan;
 
-  if (!needsPickup && !needsDeliveryPlan) return null;
+  if (!needsDellymanPickup && !needsDeliveryPlan) return null;
 
   return (
     <div style={{display: "flex", flexDirection: "column", gap: 10, marginBottom: 20}}>
-      {needsPickup && (
-        <button onClick={() => onNav?.("local_shipping")} style={deliveryBannerBtnStyle}>
+      {needsDellymanPickup && (
+        <button onClick={() => onNav?.("addresses")} style={deliveryBannerBtnStyle}>
           <span style={deliveryBannerDotStyle} />
           <span style={{flex: 1, minWidth: 0, textAlign: "left"}}>
             <span style={{display: "block", color: "#fff", fontSize: 12, fontWeight: 700}}>
-              You haven't set up a pickup location yet
+              You haven't set a Dellyman pickup address yet
             </span>
             <span style={{display: "block", color: "rgba(255,255,255,0.4)", fontSize: 10.5, marginTop: 2}}>
-              Required so couriers know where to collect orders — buyers who want to pick up in
-              person need one too.
+              Add an address on your Addresses page and mark it as your Dellyman pickup address so
+              couriers know where to collect orders.
             </span>
           </span>
           <span style={{color: "rgba(255,255,255,0.3)", fontSize: 11}}>→</span>

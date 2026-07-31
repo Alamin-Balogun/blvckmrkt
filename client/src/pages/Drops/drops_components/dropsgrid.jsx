@@ -50,10 +50,6 @@ export default function DropsGrid() {
   const addToCart = (product, e) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!getToken()) {
-      navigate("/login");
-      return;
-    }
     if (cart.includes(product.id)) {
       doRemoveFromCart(product.id);
       return;
@@ -67,10 +63,6 @@ export default function DropsGrid() {
   };
 
   const doAddToCart = async (productId, sizeId) => {
-    if (!getToken()) {
-      navigate("/login");
-      return;
-    }
     setLoadingCartId(productId);
     setAddedId(productId);
     setTimeout(() => setAddedId(null), 1500);
@@ -88,7 +80,6 @@ export default function DropsGrid() {
   };
 
   const doRemoveFromCart = async (productId) => {
-    if (!getToken()) return;
     const cartItem = cartItems.find((i) => (i.product_id ?? i.id) === productId);
     if (!cartItem) return;
     setLoadingCartId(productId);
@@ -118,14 +109,11 @@ export default function DropsGrid() {
   const handleQuickAdd = async (product, e) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!getToken()) {
-      navigate("/login");
-      return;
-    }
 
     const promises = [];
 
-    // Add to wishlist immediately regardless of sizes
+    // Add to wishlist immediately regardless of sizes — ctxAddToWishlist
+    // already no-ops for guests, so this half just quietly skips for them.
     if (!wishlist.includes(product.id)) {
       promises.push(ctxAddToWishlist(product.id));
     }

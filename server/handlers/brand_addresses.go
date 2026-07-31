@@ -27,23 +27,33 @@ func BrandCreateAddress(c *gin.Context) {
 	userID := c.GetUint("userID")
 
 	var req struct {
-		Label     string `json:"label"     binding:"required"`
-		Line1     string `json:"line1"     binding:"required"`
-		Line2     string `json:"line2"`
-		City      string `json:"city"      binding:"required"`
-		State     string `json:"state"`
-		Postcode  string `json:"postcode"`
-		Country   string `json:"country"   binding:"required"`
-		IsDefault bool   `json:"is_default"`
+		Label            string `json:"label"     binding:"required"`
+		Line1            string `json:"line1"     binding:"required"`
+		Line2            string `json:"line2"`
+		City             string `json:"city"      binding:"required"`
+		State            string `json:"state"`
+		Postcode         string `json:"postcode"`
+		Country          string `json:"country"   binding:"required"`
+		Phone            string `json:"phone"`
+		IsDefault        bool   `json:"is_default"`
+		IsDellymanPickup bool   `json:"is_dellyman_pickup"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		utils.BadRequest(c, "Label, line1, city and country are required", nil)
+		return
+	}
+	if req.IsDellymanPickup && req.Phone == "" {
+		utils.BadRequest(c, "A phone number is required for your Dellyman pickup address — the courier uses it to contact you", nil)
 		return
 	}
 
 	// If marking as default, clear existing default first
 	if req.IsDefault {
 		database.DB.Model(&models.Address{}).Where("user_id = ?", userID).Update("is_default", false)
+	}
+	// Only one Dellyman pickup address per brand
+	if req.IsDellymanPickup {
+		database.DB.Model(&models.Address{}).Where("user_id = ?", userID).Update("is_dellyman_pickup", false)
 	}
 
 	// If this is the first address, make it default automatically
@@ -54,15 +64,17 @@ func BrandCreateAddress(c *gin.Context) {
 	}
 
 	addr := models.Address{
-		UserID:    &userID,
-		Label:     req.Label,
-		Line1:     req.Line1,
-		Line2:     req.Line2,
-		City:      req.City,
-		State:     req.State,
-		Postcode:  req.Postcode,
-		Country:   req.Country,
-		IsDefault: req.IsDefault,
+		UserID:           &userID,
+		Label:            req.Label,
+		Line1:            req.Line1,
+		Line2:            req.Line2,
+		City:             req.City,
+		State:            req.State,
+		Postcode:         req.Postcode,
+		Country:          req.Country,
+		Phone:            req.Phone,
+		IsDefault:        req.IsDefault,
+		IsDellymanPickup: req.IsDellymanPickup,
 	}
 	if err := database.DB.Create(&addr).Error; err != nil {
 		utils.InternalError(c, "Failed to save address")
@@ -87,19 +99,36 @@ func BrandUpdateAddress(c *gin.Context) {
 	}
 
 	var req struct {
-		Label     string `json:"label"`
-		Line1     string `json:"line1"`
-		Line2     string `json:"line2"`
-		City      string `json:"city"`
-		State     string `json:"state"`
-		Postcode  string `json:"postcode"`
-		Country   string `json:"country"`
-		IsDefault bool   `json:"is_default"`
+		Label            string `json:"label"`
+		Line1            string `json:"line1"`
+		Line2            string `json:"line2"`
+		City             string `json:"city"`
+		State            string `json:"state"`
+		Postcode         string `json:"postcode"`
+		Country          string `json:"country"`
+		Phone            string `json:"phone"`
+		IsDefault        bool   `json:"is_default"`
+		IsDellymanPickup bool   `json:"is_dellyman_pickup"`
 	}
 	c.ShouldBindJSON(&req)
 
+	// Preserve the existing phone when the request doesn't send one, rather
+	// than blanking it out — and require a phone before this address can be
+	// used as the Dellyman pickup point (courier needs it to contact the brand).
+	effectivePhone := req.Phone
+	if effectivePhone == "" {
+		effectivePhone = addr.Phone
+	}
+	if req.IsDellymanPickup && effectivePhone == "" {
+		utils.BadRequest(c, "A phone number is required for your Dellyman pickup address — the courier uses it to contact you", nil)
+		return
+	}
+
 	if req.IsDefault && !addr.IsDefault {
 		database.DB.Model(&models.Address{}).Where("user_id = ?", userID).Update("is_default", false)
+	}
+	if req.IsDellymanPickup && !addr.IsDellymanPickup {
+		database.DB.Model(&models.Address{}).Where("user_id = ?", userID).Update("is_dellyman_pickup", false)
 	}
 
 	updates := map[string]interface{}{}
@@ -110,7 +139,9 @@ func BrandUpdateAddress(c *gin.Context) {
 	updates["state"]     = req.State
 	updates["postcode"]  = req.Postcode
 	if req.Country != "" { updates["country"] = req.Country }
+	updates["phone"]     = effectivePhone
 	updates["is_default"] = req.IsDefault
+	updates["is_dellyman_pickup"] = req.IsDellymanPickup
 
 	database.DB.Model(&addr).Updates(updates)
 	utils.OK(c, "Address updated", addr.ToResponse())
@@ -162,4 +193,30 @@ func BrandSetDefaultAddress(c *gin.Context) {
 	database.DB.Model(&models.Address{}).Where("user_id = ?", userID).Update("is_default", false)
 	database.DB.Model(&addr).Update("is_default", true)
 	utils.OK(c, "Default address updated", addr.ToResponse())
+}
+
+// ── PATCH /api/brand/addresses/:id/dellyman-pickup ────────────────────────────
+// Marks this address as the one Dellyman collects orders from — independent
+// of is_default and of PickupLocation (the buyer-facing self-collect option).
+func BrandSetDellymanPickupAddress(c *gin.Context) {
+	userID := c.GetUint("userID")
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		utils.BadRequest(c, "Invalid address ID", nil)
+		return
+	}
+
+	var addr models.Address
+	if res := database.DB.Where("id = ? AND user_id = ?", id, userID).First(&addr); res.Error != nil {
+		utils.NotFound(c, "Address not found")
+		return
+	}
+	if addr.Phone == "" {
+		utils.BadRequest(c, "Add a phone number to this address first — the courier uses it to contact you for pickup", nil)
+		return
+	}
+
+	database.DB.Model(&models.Address{}).Where("user_id = ?", userID).Update("is_dellyman_pickup", false)
+	database.DB.Model(&addr).Update("is_dellyman_pickup", true)
+	utils.OK(c, "Dellyman pickup address updated", addr.ToResponse())
 }

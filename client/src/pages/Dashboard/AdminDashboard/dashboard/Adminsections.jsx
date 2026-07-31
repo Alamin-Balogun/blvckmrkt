@@ -3679,6 +3679,8 @@ export function AdminNotifications() {
     type: "news",
     target: "all",
     target_user_id: null,
+    channel: "app",
+    image_url: "",
   });
   const [userSearch, setUserSearch] = useState("");
   const [userResults, setUserResults] = useState([]);
@@ -3733,11 +3735,20 @@ export function AdminNotifications() {
         body: form.body.trim(),
         type: form.type,
         target: form.target,
+        channel: form.channel,
+        image_url: form.image_url || undefined,
         ...(form.target === "user" && selectedUser ? {target_user_id: selectedUser.id} : {}),
       };
       const res = await sendNotification(payload);
-      showToast(`✓ Sent to ${res?.recipients ?? "?"} recipient${res?.recipients !== 1 ? "s" : ""}`);
-      setForm({title: "", body: "", type: "news", target: "all", target_user_id: null});
+      const parts = [];
+      if (form.channel !== "email") {
+        parts.push(`${res?.recipients ?? "?"} inbox${res?.recipients !== 1 ? "es" : ""}`);
+      }
+      if (form.channel !== "app") {
+        parts.push(`${res?.emails_sent ?? 0} email${res?.emails_sent !== 1 ? "s" : ""}`);
+      }
+      showToast(`✓ Sent — ${parts.join(" · ")}`);
+      setForm({title: "", body: "", type: "news", target: "all", target_user_id: null, channel: "app", image_url: ""});
       setSelectedUser(null);
       setUserSearch("");
       load();
@@ -3788,9 +3799,13 @@ export function AdminNotifications() {
     {value: "all", label: "Everyone", icon: "🌐", desc: "All active users"},
     {value: "buyers", label: "Buyers only", icon: "🛍", desc: "Users with buyer account"},
     {value: "brands", label: "Brands only", icon: "🏷", desc: "All brand accounts"},
-    {value: "employees", label: "Employees only", icon: "👔", desc: "Active staff members"},
-    {value: "partners", label: "Partners only", icon: "🤝", desc: "Active partner accounts"},
     {value: "user", label: "Specific person", icon: "🎯", desc: "One person by name or email"},
+  ];
+
+  const CHANNEL_OPTIONS = [
+    {value: "app", label: "Notification page only", desc: "Shows on their dashboard bell/notifications page"},
+    {value: "email", label: "Email only", desc: "Sent to their inbox, not shown in-app"},
+    {value: "both", label: "Both", desc: "Notification page + email"},
   ];
 
   const TYPE_COLORS = {news: "#a855f7", drop: "#ef4444", order: "#3b82f6", system: "#f59e0b"};
@@ -3872,17 +3887,25 @@ export function AdminNotifications() {
                     gap: 12,
                     alignItems: "flex-start",
                   }}>
-                  {/* Type dot */}
-                  <div
-                    style={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: "50%",
-                      background: TYPE_COLORS[n.type] || "#6b7280",
-                      flexShrink: 0,
-                      marginTop: 5,
-                    }}
-                  />
+                  {/* Image thumb or type dot */}
+                  {n.image_url ? (
+                    <img
+                      src={n.image_url}
+                      alt=""
+                      style={{width: 36, height: 36, borderRadius: 7, objectFit: "cover", flexShrink: 0, border: "1px solid rgba(255,255,255,0.08)"}}
+                    />
+                  ) : (
+                    <div
+                      style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: "50%",
+                        background: TYPE_COLORS[n.type] || "#6b7280",
+                        flexShrink: 0,
+                        marginTop: 5,
+                      }}
+                    />
+                  )}
                   {/* Content */}
                   <div style={{flex: 1, minWidth: 0}}>
                     <div
@@ -3994,7 +4017,7 @@ export function AdminNotifications() {
             Send Notification
           </p>
           <p style={{color: "rgba(255,255,255,0.3)", fontSize: 11, margin: 0}}>
-            Delivered to users' notification bell in real-time
+            Choose who gets it, and whether it lands on their notification page, in their inbox, or both
           </p>
         </div>
 
@@ -4023,6 +4046,46 @@ export function AdminNotifications() {
             placeholder="What do you want to tell them?"
             style={{...inp, resize: "vertical", lineHeight: 1.6}}
           />
+        </div>
+
+        {/* Image (optional) */}
+        <div>
+          <label style={lbl}>Image (optional)</label>
+          {form.image_url ? (
+            <div style={{position: "relative", display: "inline-block"}}>
+              <img
+                src={form.image_url}
+                alt=""
+                style={{width: "100%", maxHeight: 140, objectFit: "cover", borderRadius: 9, border: "1px solid rgba(255,255,255,0.1)", display: "block"}}
+              />
+              <button
+                onClick={() => setForm((f) => ({...f, image_url: ""}))}
+                style={{
+                  position: "absolute",
+                  top: 6,
+                  right: 6,
+                  width: 22,
+                  height: 22,
+                  borderRadius: "50%",
+                  background: "rgba(0,0,0,0.7)",
+                  border: "1px solid rgba(255,255,255,0.2)",
+                  color: "#fff",
+                  fontSize: 12,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}>
+                ×
+              </button>
+            </div>
+          ) : (
+            <ImageUpload
+              folder="notifications"
+              label="Attach Image"
+              onUpload={(url) => setForm((f) => ({...f, image_url: url}))}
+            />
+          )}
         </div>
 
         {/* Type */}
@@ -4059,57 +4122,39 @@ export function AdminNotifications() {
         {/* Target */}
         <div>
           <label style={lbl}>Send To</label>
-          <div style={{display: "flex", flexDirection: "column", gap: 5}}>
+          <select
+            value={form.target}
+            onChange={(e) => {
+              setForm((f) => ({...f, target: e.target.value}));
+              setSelectedUser(null);
+              setUserSearch("");
+            }}
+            onFocus={onFocus}
+            onBlur={onBlur}
+            style={sel}>
             {TARGET_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => {
-                  setForm((f) => ({...f, target: opt.value}));
-                  setSelectedUser(null);
-                  setUserSearch("");
-                }}
-                style={{
-                  padding: "8px 12px",
-                  borderRadius: 9,
-                  fontSize: 11,
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  border: `1px solid ${form.target === opt.value ? "rgba(239,68,68,0.45)" : "rgba(255,255,255,0.07)"}`,
-                  background:
-                    form.target === opt.value ? "rgba(239,68,68,0.1)" : "rgba(255,255,255,0.02)",
-                  color: form.target === opt.value ? "#ef4444" : "rgba(255,255,255,0.45)",
-                  transition: "all 0.15s",
-                  textAlign: "left",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                }}>
-                <span>{opt.icon}</span>
-                <div style={{flex: 1}}>
-                  <span
-                    style={{
-                      color: form.target === opt.value ? "#ef4444" : "rgba(255,255,255,0.6)",
-                    }}>
-                    {opt.label}
-                  </span>
-                  <span style={{color: "rgba(255,255,255,0.2)", fontSize: 9, marginLeft: 6}}>
-                    {opt.desc}
-                  </span>
-                </div>
-                {form.target === opt.value && (
-                  <span
-                    style={{
-                      width: 6,
-                      height: 6,
-                      borderRadius: "50%",
-                      background: "#ef4444",
-                      flexShrink: 0,
-                    }}
-                  />
-                )}
-              </button>
+              <option key={opt.value} value={opt.value} style={{color: "#000"}}>
+                {opt.icon} {opt.label} — {opt.desc}
+              </option>
             ))}
-          </div>
+          </select>
+        </div>
+
+        {/* Channel */}
+        <div>
+          <label style={lbl}>Send Via</label>
+          <select
+            value={form.channel}
+            onChange={(e) => setForm((f) => ({...f, channel: e.target.value}))}
+            onFocus={onFocus}
+            onBlur={onBlur}
+            style={sel}>
+            {CHANNEL_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value} style={{color: "#000"}}>
+                {opt.label} — {opt.desc}
+              </option>
+            ))}
+          </select>
         </div>
 
         {/* Specific user search — shown only when target = user */}
@@ -4284,6 +4329,13 @@ export function AdminNotifications() {
               }}>
               Preview
             </p>
+            {form.image_url && (
+              <img
+                src={form.image_url}
+                alt=""
+                style={{width: "100%", maxHeight: 100, objectFit: "cover", borderRadius: 7, marginBottom: 8, display: "block"}}
+              />
+            )}
             <div style={{display: "flex", gap: 8, alignItems: "flex-start"}}>
               <div
                 style={{
@@ -6988,6 +7040,25 @@ const SITE_PAGES = [
         type: "text",
         placeholder: "/brands",
       },
+      // ── Curated Products row (shown above "New Products") ────────────────────
+      {
+        key: "_curated",
+        label: "── Curated Products (above New Products) ───",
+        type: "text",
+        placeholder: "",
+      },
+      {
+        key: "curated_section_title",
+        label: "Section Title",
+        type: "text",
+        placeholder: "Editor's Picks",
+      },
+      {
+        key: "curated_products",
+        label: "Select Products",
+        type: "product_picker",
+        hint: "Pick a brand, then choose which of its products show in this row — or select all. Leave empty to hide the row.",
+      },
       // ── ProductShowcase ────────────────────────────────────────────────────
       {
         key: "_products",
@@ -8228,11 +8299,222 @@ function seedDefaults(fields, content) {
     if (f.key.startsWith("_")) return; // divider fields — skip
     if (f.type === "toggle") {
       out[f.key] = typeof content[f.key] === "boolean" ? content[f.key] : (f.default ?? false);
+    } else if (f.type === "product_picker") {
+      out[f.key] = Array.isArray(content[f.key]) ? content[f.key] : [];
     } else {
       out[f.key] = content[f.key] ?? "";
     }
   });
   return out;
+}
+
+// Brand → product checklist used by the "curated_products" field. Stores an
+// ordered array of product IDs (order = the order admin picked them in, which
+// is preserved on the homepage row).
+function ProductPickerField({value, onChange}) {
+  const selectedIds = Array.isArray(value) ? value : [];
+  const [brands, setBrands] = useState([]);
+  const [brandId, setBrandId] = useState("");
+  const [brandProducts, setBrandProducts] = useState([]);
+  const [loadingProducts, setLoadingProducts] = useState(false);
+  const [metaCache, setMetaCache] = useState({}); // product id → product object, for the "Selected" strip
+
+  useEffect(() => {
+    getBrands({limit: 200})
+      .then((d) => setBrands(d?.brands || []))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!brandId) {
+      setBrandProducts([]);
+      return;
+    }
+    let cancelled = false;
+    setLoadingProducts(true);
+    getProducts({brand_id: brandId, limit: 100})
+      .then((d) => {
+        if (cancelled) return;
+        const list = d?.products || [];
+        setBrandProducts(list);
+        setMetaCache((m) => {
+          const next = {...m};
+          list.forEach((p) => (next[p.id] = p));
+          return next;
+        });
+      })
+      .catch(() => !cancelled && setBrandProducts([]))
+      .finally(() => !cancelled && setLoadingProducts(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [brandId]);
+
+  const toggle = (id) => {
+    onChange(selectedIds.includes(id) ? selectedIds.filter((x) => x !== id) : [...selectedIds, id]);
+  };
+  const selectAllForBrand = () => {
+    const ids = brandProducts.map((p) => p.id);
+    onChange(Array.from(new Set([...selectedIds, ...ids])));
+  };
+  const deselectAllForBrand = () => {
+    const brandProductIds = new Set(brandProducts.map((p) => p.id));
+    onChange(selectedIds.filter((id) => !brandProductIds.has(id)));
+  };
+  const remove = (id) => onChange(selectedIds.filter((x) => x !== id));
+
+  const thumb = (url) => (
+    <div
+      style={{
+        width: 30,
+        height: 30,
+        borderRadius: 6,
+        background: "rgba(255,255,255,0.06)",
+        overflow: "hidden",
+        flexShrink: 0,
+      }}>
+      {url && <img src={url} alt="" style={{width: "100%", height: "100%", objectFit: "cover"}} />}
+    </div>
+  );
+
+  return (
+    <div
+      style={{
+        background: "rgba(255,255,255,0.02)",
+        border: "1px solid rgba(255,255,255,0.08)",
+        borderRadius: 10,
+        padding: 14,
+      }}>
+      {/* Selected strip */}
+      <div style={{marginBottom: 12}}>
+        <p style={{color: "rgba(255,255,255,0.35)", fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 8px"}}>
+          Selected ({selectedIds.length})
+        </p>
+        {selectedIds.length === 0 ? (
+          <p style={{color: "rgba(255,255,255,0.2)", fontSize: 11, margin: 0}}>
+            No products selected yet — this row won't show on the homepage until you pick some.
+          </p>
+        ) : (
+          <div style={{display: "flex", flexWrap: "wrap", gap: 8}}>
+            {selectedIds.map((id) => {
+              const meta = metaCache[id];
+              return (
+                <div
+                  key={id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    background: "rgba(255,255,255,0.05)",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    borderRadius: 8,
+                    padding: "4px 8px 4px 4px",
+                  }}>
+                  {thumb(meta?.images?.[0]?.url)}
+                  <span style={{color: "#fff", fontSize: 11, maxWidth: 110, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"}}>
+                    {meta?.name || `#${id}`}
+                  </span>
+                  <button
+                    onClick={() => remove(id)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "rgba(239,68,68,0.7)",
+                      cursor: "pointer",
+                      fontSize: 14,
+                      lineHeight: 1,
+                      padding: "0 2px",
+                    }}>
+                    ×
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Brand picker */}
+      <select
+        value={brandId}
+        onChange={(e) => setBrandId(e.target.value)}
+        style={{
+          width: "100%",
+          boxSizing: "border-box",
+          background: "rgba(255,255,255,0.04)",
+          border: "1px solid rgba(255,255,255,0.1)",
+          color: "#fff",
+          fontSize: 12,
+          padding: "9px 12px",
+          borderRadius: 8,
+          outline: "none",
+          marginBottom: brandId ? 10 : 0,
+        }}>
+        <option value="" style={{color: "#000"}}>
+          — Choose a brand —
+        </option>
+        {brands.map((b) => (
+          <option key={b.id} value={b.id} style={{color: "#000"}}>
+            {b.brand_name}
+          </option>
+        ))}
+      </select>
+
+      {brandId && (
+        <div>
+          <div style={{display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8}}>
+            <span style={{color: "rgba(255,255,255,0.3)", fontSize: 10}}>
+              {loadingProducts ? "Loading…" : `${brandProducts.length} product${brandProducts.length === 1 ? "" : "s"}`}
+            </span>
+            <div style={{display: "flex", gap: 8}}>
+              <button
+                onClick={selectAllForBrand}
+                disabled={brandProducts.length === 0}
+                style={{background: "none", border: "none", color: "#ef4444", fontSize: 10, fontWeight: 700, cursor: "pointer", padding: 0}}>
+                Select all
+              </button>
+              <button
+                onClick={deselectAllForBrand}
+                disabled={brandProducts.length === 0}
+                style={{background: "none", border: "none", color: "rgba(255,255,255,0.4)", fontSize: 10, fontWeight: 700, cursor: "pointer", padding: 0}}>
+                Deselect all
+              </button>
+            </div>
+          </div>
+
+          <div style={{maxHeight: 260, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6}}>
+            {brandProducts.map((p) => (
+              <label
+                key={p.id}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "6px 8px",
+                  borderRadius: 7,
+                  cursor: "pointer",
+                  background: selectedIds.includes(p.id) ? "rgba(239,68,68,0.08)" : "transparent",
+                }}>
+                <input
+                  type="checkbox"
+                  checked={selectedIds.includes(p.id)}
+                  onChange={() => toggle(p.id)}
+                  style={{accentColor: "#ef4444"}}
+                />
+                {thumb(p.images?.[0]?.url)}
+                <span style={{color: "#fff", fontSize: 12, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"}}>
+                  {p.name}
+                </span>
+              </label>
+            ))}
+            {!loadingProducts && brandProducts.length === 0 && (
+              <p style={{color: "rgba(255,255,255,0.2)", fontSize: 11, margin: 0}}>No products for this brand.</p>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function AdminSitePages() {
@@ -8616,6 +8898,11 @@ export function AdminSitePages() {
                             />
                           </div>
                         </div>
+                      ) : field.type === "product_picker" ? (
+                        <ProductPickerField
+                          value={content[field.key]}
+                          onChange={(ids) => setContent((c) => ({...c, [field.key]: ids}))}
+                        />
                       ) : field.type === "textarea" ? (
                         <textarea
                           value={content[field.key] || ""}

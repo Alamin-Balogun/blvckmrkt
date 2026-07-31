@@ -1,7 +1,7 @@
 import {useState, useEffect, useCallback} from "react";
 import {motion, AnimatePresence} from "framer-motion";
 import {Link, useNavigate} from "react-router-dom";
-import {useCartWishlist, getToken} from "../../../components/cartcontext";
+import {useCartWishlist} from "../../../components/cartcontext";
 import {useCurrency} from "../../../components/currencycontext";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "https://blvckmrktng.com";
@@ -663,7 +663,7 @@ function BrandShippingPanel({brand, brandId, items, onSelect, selected, fmtMoney
 
 // ── Main CartGrid ──────────────────────────────────────────────────────────────
 export default function CartGrid() {
-  const {cartItems, refreshCart, removeFromCart} = useCartWishlist();
+  const {cartItems, refreshCart, removeFromCart, updateCartQuantity} = useCartWishlist();
   const {fmtMoney, convert, baseCurrency} = useCurrency();
   const [items,        setItems]       = useState([]);
   const [loading,      setLoading]     = useState(true);
@@ -682,8 +682,7 @@ export default function CartGrid() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const token = getToken();
-    if (!token) { navigate("/login"); return; }
+    // No login required — guests get a localStorage cart (see cartcontext.jsx).
     refreshCart();
   }, []); // eslint-disable-line
 
@@ -707,6 +706,7 @@ export default function CartGrid() {
       size:       ci.selected_size       ?? "—",
       price:      Number(ci.product?.price        ?? 0),
       comparePrice: Number(ci.product?.compare_price ?? 0),
+      weight:     Number(ci.product?.weight ?? 2),
       qty:        ci.quantity ?? 1,
       image:      ci.product?.primary_image ?? "",
       slug:       ci.product?.slug ?? ci.product_id,
@@ -728,6 +728,18 @@ export default function CartGrid() {
   }, []);
 
   const subtotal = items.reduce((s, i) => s + i.price * i.qty, 0);
+  const totalWeight = items.reduce((s, i) => s + i.weight * i.qty, 0);
+
+  // Tax — the platform's commission, re-surfaced as a line item (mirrors the
+  // exact formula used at checkout — see checkoutform.jsx — and the server's
+  // itemTax() in create_order.go): per item, (comparePrice - price) is the
+  // fee that was deducted when the price was set, converted to the buyer's
+  // display currency and summed across items.
+  const tax = items.reduce((s, i) => {
+    const cmp = convert(i.comparePrice || 0, baseCurrency);
+    const price = convert(i.price, baseCurrency);
+    return s + Math.max(0, cmp - price) * i.qty;
+  }, 0);
 
   const totalShipping = brandGroupList.reduce((s, g) => {
     const sel = brandShipping[g.brandId];
@@ -744,7 +756,7 @@ export default function CartGrid() {
       : appliedCoupon.value
     : 0;
 
-  const total = Math.max(0, subtotal - discount + totalShipping);
+  const total = Math.max(0, subtotal - discount + totalShipping + tax);
   const totalQty = items.reduce((s, i) => s + i.qty, 0);
 
   const hasAtLeastOneShipping = brandGroupList.some((g) => !!brandShipping[g.brandId]);
@@ -756,21 +768,10 @@ export default function CartGrid() {
     setItems((prev) => prev.map((i) => i.cartItemId === item.cartItemId ? {...i, qty: newQty} : i));
     setUpdatingId(item.cartItemId);
     setQtyError("");
-    const token = getToken();
-    try {
-      const res = await fetch(`${API_BASE}/api/user/cart/${item.cartItemId}`, {
-        method: "PUT",
-        headers: {Authorization: `Bearer ${token}`, "Content-Type": "application/json"},
-        body: JSON.stringify({quantity: newQty}),
-      });
-      if (!res.ok) {
-        const json = await res.json().catch(() => ({}));
-        setItems((prev) => prev.map((i) => i.cartItemId === item.cartItemId ? {...i, qty: prevQty} : i));
-        setQtyError(json.message || "Couldn't update quantity — not enough stock.");
-      }
-    } catch {
+    const result = await updateCartQuantity(item.cartItemId, item.productId, newQty);
+    if (!result.ok) {
       setItems((prev) => prev.map((i) => i.cartItemId === item.cartItemId ? {...i, qty: prevQty} : i));
-      setQtyError("Couldn't update quantity. Please try again.");
+      setQtyError(result.message || "Couldn't update quantity — not enough stock.");
     }
     setUpdatingId(null);
   };
@@ -1091,6 +1092,11 @@ export default function CartGrid() {
             <span className="s-value">{fmtMoney(subtotal)}</span>
           </div>
 
+          <div className="summary-row">
+            <span className="s-label">Total Weight</span>
+            <span className="s-value">{totalWeight.toFixed(1)} kg</span>
+          </div>
+
           <div className="summary-row" style={{flexDirection: "column", alignItems: "stretch", gap: 6}}>
             <div style={{display: "flex", justifyContent: "space-between"}}>
               <span className="s-label">Shipping</span>
@@ -1130,8 +1136,8 @@ export default function CartGrid() {
           )}
 
           <div className="summary-row">
-            <span className="s-label">Taxes</span>
-            <span className="s-value">₦0.00</span>
+            <span className="s-label">Tax</span>
+            <span className="s-value">{fmtMoney(tax)}</span>
           </div>
 
           <div style={{display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 0 20px"}}>

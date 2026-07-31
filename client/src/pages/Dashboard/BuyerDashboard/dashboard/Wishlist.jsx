@@ -667,7 +667,16 @@ const back = () => {
     return convert ? convert(raw, fromCur) : raw;
   }, [selectedShippingMethod, deliveryMode, convert, baseCurrency]);
 
-  const orderTotal = Math.max(0, itemTotal + deliveryCost);
+  // Tax — the platform's commission, re-surfaced here as a checkout line
+  // (mirrors Shop.jsx's Buy Now flow and the server's itemTax() in create_order.go).
+  const tax = useMemo(() => {
+    const raw = Math.max(0, (product.compare_price || 0) - product.price) * qty;
+    return convert ? convert(raw, baseCurrency) : raw;
+  }, [product.compare_price, product.price, qty, convert, baseCurrency]);
+
+  const totalWeight = (product.weight || 2) * qty;
+
+  const orderTotal = Math.max(0, itemTotal + deliveryCost + tax);
   const hasDiscount = product.compare_price > 0 && product.compare_price !== product.price;
 
   useEffect(() => {
@@ -1333,12 +1342,16 @@ const uploadRes = await fetch(`${API_BASE}/api/buyer/upload/receipt`, {
                       <span style={{color:"rgba(255,255,255,0.4)",fontSize:12}}>{deliveryMode==="pickup"?"Pickup":"Shipping"}</span>
                       <span style={{color:deliveryCost===0?"#22c55e":"rgba(255,255,255,0.7)",fontSize:12,fontWeight:700}}>{deliveryCost===0?"FREE":fmtMoney(deliveryCost)}</span>
                     </div>
-                    {hasDiscount && (
+                    {tax > 0 && (
                       <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
-                        <span style={{color:"#22c55e",fontSize:12,fontWeight:700}}>You Save</span>
-                        <span style={{color:"#22c55e",fontSize:12,fontWeight:700}}>{fmtMoney((product.compare_price-product.price)*qty)}</span>
+                        <span style={{color:"rgba(255,255,255,0.4)",fontSize:12}}>Tax</span>
+                        <span style={{color:"rgba(255,255,255,0.7)",fontSize:12,fontWeight:700}}>{fmtMoney(tax)}</span>
                       </div>
                     )}
+                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}>
+                      <span style={{color:"rgba(255,255,255,0.4)",fontSize:12}}>Weight</span>
+                      <span style={{color:"rgba(255,255,255,0.7)",fontSize:12,fontWeight:700}}>{totalWeight.toFixed(1)} kg</span>
+                    </div>
                     <div style={{height:1,background:"rgba(255,255,255,0.07)",margin:"0 0 10px"}}/>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                       <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"1.1rem",color:"#fff",letterSpacing:"0.08em"}}>TOTAL</span>
@@ -1769,6 +1782,9 @@ const handleBuyNow = (item) => {
                           lineHeight: 1.1,
                         }}>
                         {fmtMoney(price)}
+                      </p>
+                      <p style={{color: "rgba(255,255,255,0.25)", fontSize: 9, margin: "2px 0 0"}}>
+                        {(item.product?.weight || 2).toFixed(1)} kg
                       </p>
                     </div>
                     <button

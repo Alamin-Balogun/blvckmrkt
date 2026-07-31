@@ -29,6 +29,7 @@ type Notification struct {
 	Type      NotifType      `gorm:"type:varchar(50);default:'news'"    json:"type"`
 	Title     string         `gorm:"type:varchar(255);not null"         json:"title"`
 	Body      string         `gorm:"type:text;not null"                 json:"body"`
+	ImageURL  string         `gorm:"type:varchar(512)"                  json:"image_url,omitempty"`
 	IsRead    bool           `gorm:"default:false"                      json:"is_read"`
 	RefType   string         `gorm:"type:varchar(50)"                   json:"ref_type,omitempty"`
 	RefID     *uint          `gorm:"default:null"                       json:"ref_id,omitempty"`
@@ -46,6 +47,7 @@ func (n *Notification) ToResponse() NotificationResponse {
 		Type:      string(n.Type),
 		Title:     n.Title,
 		Body:      n.Body,
+		ImageURL:  n.ImageURL,
 		IsRead:    n.IsRead,
 		RefType:   n.RefType,
 		RefID:     n.RefID,
@@ -58,6 +60,7 @@ type NotificationResponse struct {
 	Type      string    `json:"type"`
 	Title     string    `json:"title"`
 	Body      string    `json:"body"`
+	ImageURL  string    `json:"image_url,omitempty"`
 	IsRead    bool      `json:"is_read"`
 	RefType   string    `json:"ref_type,omitempty"`
 	RefID     *uint     `json:"ref_id,omitempty"`
@@ -73,6 +76,7 @@ type NotificationItem struct {
 	Type      string    `json:"type"` // "news" | "drop" | "order" | "system"
 	Title     string    `json:"title"`
 	Body      string    `json:"body"`
+	ImageURL  string    `json:"image_url,omitempty"`
 	IsRead    bool      `json:"is_read"`
 	CreatedAt time.Time `json:"created_at"`
 }
@@ -84,6 +88,7 @@ func (n *Notification) ToItem() NotificationItem {
 		Type:      string(n.Type),
 		Title:     n.Title,
 		Body:      n.Body,
+		ImageURL:  n.ImageURL,
 		IsRead:    n.IsRead,
 		CreatedAt: n.CreatedAt,
 	}

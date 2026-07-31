@@ -117,7 +117,6 @@ export default function ProductShowcase() {
   const handleCartIcon = (product, e) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!getToken()) { navigate("/login"); return; }
     if (cart.includes(product.id)) {
       doRemoveFromCart(product.id);
       return;
@@ -131,14 +130,12 @@ export default function ProductShowcase() {
   const handleQuickAdd = (product, e) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!getToken()) { navigate("/login"); return; }
     const sizes = product.sizes ?? [];
     if (sizes.length > 0) { setSizeModal(product); return; }
     doAddToCart(product.id, null);
   };
 
   const doAddToCart = async (productId, sizeId) => {
-    if (!getToken()) { navigate("/login"); return; }
     setLoadingCartId(productId);
     setAddedId(productId);
     setTimeout(() => setAddedId(null), 1500);
@@ -152,7 +149,6 @@ export default function ProductShowcase() {
   };
 
   const doRemoveFromCart = async (productId) => {
-    if (!getToken()) return;
     const cartItem = cartItems.find((i) => (i.product_id ?? i.id) === productId);
     if (!cartItem) return;
     setLoadingCartId(productId);

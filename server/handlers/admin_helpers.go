@@ -15,8 +15,11 @@ func adminPageParams(c *gin.Context) (limit int, offset int) {
 	limit = 20
 	page := 1
 
-	if l, err := strconv.Atoi(c.Query("limit")); err == nil && l > 0 && l <= 100 {
+	if l, err := strconv.Atoi(c.Query("limit")); err == nil && l > 0 {
 		limit = l
+		if limit > 100 {
+			limit = 100
+		}
 	}
 	if p, err := strconv.Atoi(c.Query("page")); err == nil && p > 1 {
 		page = p

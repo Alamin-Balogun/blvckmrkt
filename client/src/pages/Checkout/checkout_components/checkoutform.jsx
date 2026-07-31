@@ -82,24 +82,28 @@ function CopyRow({label, value, highlight}) {
 }
 
 // ─── Portal dropdown ──────────────────────────────────────────────────────────
-function SearchSelect({options, value, onChange, placeholder, disabled}) {
+// A real typeable text field — not a click-to-open picker. Typing filters a
+// live dropdown of every option (shown in full on focus, narrowed as you
+// type), but the field never forces a match: whatever text is in the box is
+// the value, so someone who can't find their country/state/city on the list
+// can just type it in by hand. Selecting a suggestion snaps the text to its
+// canonical label and reports the option back via onSelect so the parent can
+// resolve an ISO code (used only to drive the next field's suggestions).
+function TypeaheadField({options, text, onTextChange, onSelect, placeholder, disabled, hasError}) {
   const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const triggerRef = useRef(null);
+  const inputRef = useRef(null);
   const dropdownRef = useRef(null);
   const [coords, setCoords] = useState({top: 0, left: 0, width: 0});
 
-  const selected = useMemo(() => options.find((o) => o.value === value), [options, value]);
-
   const filtered = useMemo(() => {
-    if (!query.trim()) return options.slice(0, 250);
-    const q = query.toLowerCase();
+    const q = (text || "").trim().toLowerCase();
+    if (!q) return options.slice(0, 250);
     return options.filter((o) => o.label.toLowerCase().includes(q)).slice(0, 250);
-  }, [options, query]);
+  }, [options, text]);
 
   const syncCoords = useCallback(() => {
-    if (!triggerRef.current) return;
-    const r = triggerRef.current.getBoundingClientRect();
+    if (!inputRef.current) return;
+    const r = inputRef.current.getBoundingClientRect();
     if (r.bottom < 0 || r.top > window.innerHeight) {
       setOpen(false);
       return;
@@ -108,10 +112,10 @@ function SearchSelect({options, value, onChange, placeholder, disabled}) {
   }, []);
 
   const openDropdown = useCallback(() => {
-    if (disabled || !triggerRef.current) return;
+    if (disabled || options.length === 0) return;
     syncCoords();
     setOpen(true);
-  }, [disabled, syncCoords]);
+  }, [disabled, options.length, syncCoords]);
 
   useEffect(() => {
     if (!open) return;
@@ -123,85 +127,69 @@ function SearchSelect({options, value, onChange, placeholder, disabled}) {
     };
   }, [open, syncCoords]);
 
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e) => {
-      if (
-        triggerRef.current &&
-        !triggerRef.current.contains(e.target) &&
-        dropdownRef.current &&
-        !dropdownRef.current.contains(e.target)
-      )
-        setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) setQuery("");
-  }, [open]);
-
   const pick = (opt) => {
-    onChange(opt.value);
+    onSelect(opt);
     setOpen(false);
   };
 
   return (
     <>
-      <button
-        ref={triggerRef}
-        type="button"
-        disabled={disabled}
-        onClick={() => (open ? setOpen(false) : openDropdown())}
-        style={{
-          width: "100%",
-          background: disabled ? "rgba(255,255,255,0.02)" : open ? "#1e1e1e" : "rgba(255,255,255,0.04)",
-          border: `1px solid ${open ? "rgba(239,68,68,0.55)" : disabled ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.1)"}`,
-          borderRadius: 8,
-          padding: "12px 14px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 8,
-          cursor: disabled ? "not-allowed" : "pointer",
-          transition: "all 0.18s",
-          outline: "none",
-          boxShadow: open ? "0 0 0 3px rgba(239,68,68,0.1)" : "none",
-          fontFamily: "inherit",
-        }}>
-        <div style={{display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0}}>
-          {selected?.flag && (
-            <span style={{fontSize: 16, lineHeight: 1, flexShrink: 0}}>{selected.flag}</span>
-          )}
-          <span
-            style={{
-              fontSize: 13,
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-              color: disabled ? "rgba(255,255,255,0.18)" : selected ? "#fff" : "rgba(255,255,255,0.28)",
-            }}>
-            {selected ? selected.label : placeholder}
-          </span>
-        </div>
-        <svg
-          style={{
-            flexShrink: 0,
-            transform: open ? "rotate(180deg)" : "rotate(0deg)",
-            transition: "transform 0.18s",
+      <div style={{position: "relative"}}>
+        <input
+          ref={inputRef}
+          type="text"
+          value={text || ""}
+          disabled={disabled}
+          placeholder={placeholder}
+          autoComplete="off"
+          onChange={(e) => {
+            onTextChange(e.target.value);
+            if (options.length > 0) openDropdown();
           }}
-          width="11"
-          height="11"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke={disabled ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.3)"}
-          strokeWidth="2.5">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
+          onFocus={() => openDropdown()}
+          onBlur={() => setOpen(false)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setOpen(false);
+          }}
+          style={{
+            background: disabled ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.04)",
+            border: `1px solid ${hasError ? "#ef4444" : open ? "rgba(239,68,68,0.55)" : "rgba(255,255,255,0.1)"}`,
+            color: "#fff",
+            fontSize: 13,
+            padding: options.length > 0 ? "12px 34px 12px 14px" : "12px 14px",
+            outline: "none",
+            width: "100%",
+            boxSizing: "border-box",
+            borderRadius: 8,
+            transition: "border-color 0.2s",
+            fontFamily: "inherit",
+            boxShadow: open ? "0 0 0 3px rgba(239,68,68,0.1)" : "none",
+            cursor: disabled ? "not-allowed" : "text",
+          }}
+        />
+        {options.length > 0 && (
+          <svg
+            style={{
+              position: "absolute",
+              right: 12,
+              top: "50%",
+              transform: open ? "translateY(-50%) rotate(180deg)" : "translateY(-50%)",
+              transition: "transform 0.18s",
+              pointerEvents: "none",
+            }}
+            width="11"
+            height="11"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke={disabled ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.3)"}
+            strokeWidth="2.5">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        )}
+      </div>
 
       {open &&
+        options.length > 0 &&
         createPortal(
           <div
             ref={dropdownRef}
@@ -217,65 +205,24 @@ function SearchSelect({options, value, onChange, placeholder, disabled}) {
               boxShadow: "0 24px 64px rgba(0,0,0,0.85), 0 0 0 1px rgba(239,68,68,0.08)",
               overflow: "hidden",
             }}>
-            <div
-              style={{
-                padding: "10px 10px 8px",
-                borderBottom: "1px solid rgba(255,255,255,0.07)",
-                background: "#1e1e1e",
-              }}>
-              <div style={{position: "relative"}}>
-                <svg
-                  width="13"
-                  height="13"
-                  fill="none"
-                  stroke="rgba(255,255,255,0.2)"
-                  strokeWidth="2"
-                  viewBox="0 0 24 24"
-                  style={{
-                    position: "absolute",
-                    left: 10,
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    pointerEvents: "none",
-                  }}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-                <input
-                  autoFocus
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search…"
-                  style={{
-                    width: "100%",
-                    boxSizing: "border-box",
-                    background: "rgba(255,255,255,0.06)",
-                    border: "1px solid rgba(255,255,255,0.1)",
-                    borderRadius: 8,
-                    padding: "8px 10px 8px 32px",
-                    color: "#fff",
-                    fontSize: 12,
-                    outline: "none",
-                    fontFamily: "inherit",
-                    transition: "border-color 0.15s",
-                  }}
-                  onFocus={(e) => (e.target.style.borderColor = "rgba(239,68,68,0.5)")}
-                  onBlur={(e) => (e.target.style.borderColor = "rgba(255,255,255,0.1)")}
-                />
-              </div>
-            </div>
             <div style={{maxHeight: 260, overflowY: "auto"}}>
               {filtered.length === 0 ? (
                 <div style={{padding: "18px", color: "rgba(255,255,255,0.25)", fontSize: 12, textAlign: "center"}}>
-                  No results for "{query}"
+                  No matches — the text you typed will be used as-is
                 </div>
               ) : (
                 filtered.map((opt) => {
-                  const isSelected = opt.value === value;
+                  const isSelected = opt.label.toLowerCase() === (text || "").trim().toLowerCase();
                   return (
                     <button
                       key={opt.value}
                       type="button"
-                      onClick={() => pick(opt)}
+                      // onMouseDown (not onClick) fires before the input's onBlur,
+                      // so the pick registers before the dropdown closes.
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        pick(opt);
+                      }}
                       style={{
                         width: "100%",
                         textAlign: "left",
@@ -1009,6 +956,15 @@ const extractLocationFromMethod = useCallback((method) => {
     }
   }, [step]); // eslint-disable-line
 
+const countryOptions = useMemo(() => {
+    if (!geoLoaded) return [];
+    return Country.getAllCountries().map((c) => ({
+      value: c.isoCode,
+      label: c.name,
+      flag: c.flag,
+    }));
+  }, [geoLoaded, Country]);
+
 const stateOptions = useMemo(() => {
     if (!geoLoaded || !delivery.country_code) return [];
     return State.getStatesOfCountry(delivery.country_code).map((s) => ({
@@ -1032,11 +988,7 @@ const cityOptions = useMemo(() => {
       setCartLoading(false);
       return;
     }
-    const token = getToken();
-    if (!token) {
-      navigate("/login");
-      return;
-    }
+    // No login required — guests get a localStorage cart (see cartcontext.jsx).
     refreshCart();
   }, []); // eslint-disable-line
 
@@ -1252,7 +1204,7 @@ const cityOptions = useMemo(() => {
     }
     if (step === 1) {
       if (deliveryMode === "delivery") {
-        if (!delivery.country_code) e.country = "Required";
+        if (!delivery.country_name?.trim()) e.country = "Required";
         if (!delivery.firstName.trim()) e.firstName = "Required";
         if (!delivery.lastName.trim()) e.lastName = "Required";
         if (!delivery.address.trim()) e.address = "Required";
@@ -2154,35 +2106,38 @@ if (!delivery.country_code && geoLoaded) {
                       <div className="co-row-1">
                         <div className="co-field">
                           <label className="co-label">Country *</label>
-                          <select
-                            value={delivery.country_code || ""}
-                            onChange={(e) => {
-                              const code = e.target.value;
-                              const c = (geoLoaded && code) ? Country.getCountryByCode(code) : null;
+                          <TypeaheadField
+                            options={countryOptions}
+                            text={delivery.country_name}
+                            hasError={!!errors.country}
+                            onTextChange={(text) => {
+                              // Typing freely is allowed — only auto-resolve an
+                              // ISO code (which drives the State suggestions)
+                              // when the text exactly matches a real country;
+                              // otherwise leave it as manual free text.
+                              const match = countryOptions.find(
+                                (o) => o.label.toLowerCase() === text.trim().toLowerCase()
+                              );
                               setDelivery((prev) => ({
                                 ...prev,
-                                country_code: code,
-                                country_name: c?.name || "",
+                                country_name: text,
+                                country_code: match ? match.value : "",
+                              }));
+                              setErrors((prev) => ({...prev, country: null}));
+                            }}
+                            onSelect={(opt) => {
+                              setDelivery((prev) => ({
+                                ...prev,
+                                country_code: opt.value,
+                                country_name: opt.label,
                                 state_code: "",
                                 state_name: "",
                                 city: "",
                               }));
                               setErrors((prev) => ({...prev, country: null}));
                             }}
-                            style={{
-                              ...inp(errors.country),
-                              cursor: "pointer",
-                              appearance: "none",
-                              color: "#fff",
-                              backgroundColor: "#111",
-                            }}>
-                            <option value="">Select Country</option>
-                            {(geoLoaded ? Country.getAllCountries() : []).map((c) => (
-                              <option key={c.isoCode} value={c.isoCode}>
-                                {c.flag} {c.name}
-                              </option>
-                            ))}
-                          </select>
+                            placeholder="Type or select a country…"
+                          />
                           {errors.country && (
                             <span className="co-error">{errors.country}</span>
                           )}
@@ -2269,63 +2224,54 @@ if (!delivery.country_code && geoLoaded) {
                       </div>
 
                       {/* State */}
-                      {delivery.country_code && (
+                      {delivery.country_name && (
                         <div className="co-row-1" style={{marginBottom: 12}}>
                           <div className="co-field">
                             <label className="co-label">State / Region *</label>
-                            <SearchSelect
+                            <TypeaheadField
                               options={stateOptions}
-                              value={delivery.state_code}
-                              onChange={(iso) => {
-                                const s = geoLoaded ? State.getStateByCodeAndCountry(
-                                  iso,
-                                  delivery.country_code
-                                ) : null;
-                                setDelivery({
-                                  ...delivery,
-                                  state_code: iso,
-                                  state_name: s?.name || "",
-                                  city: "",
-                                });
+                              text={delivery.state_name}
+                              onTextChange={(text) => {
+                                const match = stateOptions.find(
+                                  (o) => o.label.toLowerCase() === text.trim().toLowerCase()
+                                );
+                                setDelivery((prev) => ({
+                                  ...prev,
+                                  state_name: text,
+                                  state_code: match ? match.value : "",
+                                }));
                               }}
-                              placeholder="Select state…"
-                              disabled={!delivery.country_code}
+                              onSelect={(opt) => {
+                                setDelivery((prev) => ({
+                                  ...prev,
+                                  state_code: opt.value,
+                                  state_name: opt.label,
+                                  city: "",
+                                }));
+                              }}
+                              placeholder="Type or select a state…"
                             />
                           </div>
                         </div>
                       )}
 
                       {/* City */}
-                      {delivery.state_code && (
+                      {delivery.state_name && (
                         <div className="co-row-1">
                           <div className="co-field">
                             <label className="co-label">City *</label>
-                            {cityOptions.length > 0 ? (
-                              <SearchSelect
-                                options={cityOptions}
-                                value={delivery.city}
-                                onChange={(name) => setDelivery({...delivery, city: name})}
-                                placeholder="Select city…"
-                                disabled={!delivery.state_code}
-                              />
-                            ) : (
-                              <input
-                                style={inp(errors.city)}
-                                placeholder="Type city name…"
-                                value={delivery.city}
-                                onChange={(e) =>
-                                  setDelivery({...delivery, city: e.target.value})
-                                }
-                                onFocus={(e) =>
-                                  (e.target.style.borderColor = "rgba(239,68,68,0.6)")
-                                }
-                                onBlur={(e) =>
-                                  (e.target.style.borderColor = errors.city
-                                    ? "#ef4444"
-                                    : "rgba(255,255,255,0.1)")
-                                }
-                              />
-                            )}
+                            <TypeaheadField
+                              options={cityOptions}
+                              text={delivery.city}
+                              hasError={!!errors.city}
+                              onTextChange={(text) =>
+                                setDelivery((prev) => ({...prev, city: text}))
+                              }
+                              onSelect={(opt) =>
+                                setDelivery((prev) => ({...prev, city: opt.label}))
+                              }
+                              placeholder="Type or select a city…"
+                            />
                             {errors.city && <span className="co-error">{errors.city}</span>}
                           </div>
                         </div>
@@ -2413,7 +2359,7 @@ if (!delivery.country_code && geoLoaded) {
                         </div>
                       ) : (
                         <>
-                      {!delivery.country_code &&
+                      {!delivery.country_name &&
                         !delivery.state_name &&
                         !delivery.city && (
                           <div

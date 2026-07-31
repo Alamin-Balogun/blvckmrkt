@@ -898,31 +898,37 @@ function AccessRestricted({ message, onLogout }) {
   );
 }
 
+// ── Pending Review Banner ─────────────────────────────────────────────────────
+// Persistent strip shown across every page of a not-yet-verified brand's
+// dashboard — they get full access, but need a constant reminder that their
+// products stay hidden site-wide until an admin verifies them.
+function PendingReviewBanner() {
+  return (
+    <div style={{
+      background: "rgba(245,158,11,0.08)",
+      border: "1px solid rgba(245,158,11,0.25)",
+      borderRadius: 12,
+      padding: "12px 18px",
+      marginBottom: 20,
+      display: "flex",
+      alignItems: "center",
+      gap: 12,
+    }}>
+      <span style={{ fontSize: "1.1rem", flexShrink: 0 }}>⏳</span>
+      <p style={{ color: "#f59e0b", fontSize: 12, lineHeight: 1.6, margin: 0 }}>
+        <strong>Your brand is still under review.</strong> You have full access to your dashboard,
+        but your products won't be shown on BLVCKMRKT — to buyers or in your own brand/shop
+        views — until an admin verifies your account. We'll email you once that's done.
+      </p>
+    </div>
+  );
+}
+
 // ── Verification Blocked Screen ───────────────────────────────────────────────
 // Shown while RequireVerifiedBrand (backend) is rejecting dashboard requests —
-// i.e. the brand's verification_status isn't "verified" yet.
+// i.e. the brand's been suspended by an admin.
 function VerificationBlocked({ status, onLogout }) {
   const config = {
-    pending: {
-      icon: "⏳",
-      iconColor: "#f59e0b",
-      iconBg: "rgba(245,158,11,0.1)",
-      iconBorder: "rgba(245,158,11,0.3)",
-      badge: "Verification Pending",
-      badgeColor: "rgba(245,158,11,0.3)",
-      badgeText: "#f59e0b",
-      headline: ["BRAND UNDER", "REVIEW"],
-      accentWord: 1,
-      accentColor: "#f59e0b",
-      body: "Your brand application is currently being reviewed by our team. This process typically takes a few business days. You'll receive a confirmation email at your registered address once your brand is verified and your dashboard unlocks.",
-      tip: "If this takes longer than 7 business days, contact us at blvckmrkt.market@gmail.com.",
-      tipColor: "rgba(245,158,11,0.15)",
-      tipBorder: "rgba(245,158,11,0.25)",
-      tipTextColor: "rgba(245,158,11,0.8)",
-      primaryBtn: null,
-      secondaryLabel: "Log Out",
-      secondaryAction: onLogout,
-    },
     suspended: {
       icon: "🚫",
       iconColor: "#ef4444",
@@ -945,7 +951,7 @@ function VerificationBlocked({ status, onLogout }) {
     },
   };
 
-  const c = config[status] || config.pending;
+  const c = config[status] || config.suspended;
 
   return (
     <div style={{
@@ -1134,7 +1140,7 @@ export default function BrandDashboard() {
 const [showLogoutModal, setShowLogoutModal] = useState(false);
 const [verificationStatus, setVerificationStatus] = useState(null);
 
-const BLOCKED_STATUSES = ["pending", "suspended"];
+const BLOCKED_STATUSES = ["suspended"];
 
 useEffect(() => {
   getBrandProfile()
@@ -1333,6 +1339,7 @@ if (!loading && verificationStatus && BLOCKED_STATUSES.includes(verificationStat
         </div>
 
         <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "30px 15px 0" }}>
+          {verificationStatus === "pending" && <PendingReviewBanner />}
           <AnimatePresence mode="wait">
             <motion.div
               key={activeSection}

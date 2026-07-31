@@ -9,6 +9,8 @@ import { useAuth } from "./pages/Auth/context/authcontext";
 
 import DashboardFAB from "./components/DashboardFAB";
 import VisitTracker from "./components/visittracker";
+import ScrollToTop from "./components/scrolltotop";
+import SignupPrompt from "./components/signupprompt";
 
 function DashboardGuard({ children, required, redirect }) {
   const { user, loading } = useAuth();
@@ -100,8 +102,10 @@ createRoot(document.getElementById("root")).render(
           <CartWishlistProvider>
             {/* ✅ Suspense wraps ALL routes — shows PageLoader while chunk downloads */}
             <Suspense fallback={<PageLoader />}>
+            <ScrollToTop />
             <DashboardFAB />
             <VisitTracker />
+            <SignupPrompt />
               <Routes>
                 <Route path="/"                          element={<Home />} />
                 <Route path="/shop"                      element={<Shop />} />

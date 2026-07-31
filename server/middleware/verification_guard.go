@@ -7,10 +7,12 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// RequireVerifiedBrand blocks brand dashboard access until admin has marked
-// the brand's account verified. Replaces the old SubscriptionGuard — the
-// subscription feature has been removed, so verification status alone now
-// decides whether a brand's dashboard/storefront presence is active.
+// RequireVerifiedBrand blocks brand dashboard access only when an admin has
+// suspended the account. Pending (not-yet-verified) brands get full
+// dashboard access — verification only controls whether their products are
+// publicly visible (see the verification_status filter in shop.go), not
+// whether they can log in and use their dashboard. Replaces the old
+// SubscriptionGuard — the subscription feature has been removed.
 func RequireVerifiedBrand() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := c.GetUint("userID")
@@ -22,9 +24,9 @@ func RequireVerifiedBrand() gin.HandlerFunc {
 			return
 		}
 
-		if brand.VerificationStatus != models.VerificationVerified {
-			utils.Forbidden(c, "Your brand is still pending verification. "+
-				"We'll notify you once it's approved. Contact blvckmrkt.market@gmail.com if this takes longer than a few business days.")
+		if brand.VerificationStatus == models.VerificationSuspended {
+			utils.Forbidden(c, "Your brand's dashboard access has been suspended. "+
+				"Contact blvckmrkt.market@gmail.com for details.")
 			c.Abort()
 			return
 		}

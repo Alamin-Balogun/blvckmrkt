@@ -5,7 +5,9 @@ import {
   updateAddress,
   deleteAddress,
   setDefaultAddress,
+  setDellymanPickupAddress,
 } from "./dashboard_components/api";
+import PhoneInput from "../../../../components/phoneinput";
 
 const BLANK = {
   label: "",
@@ -15,7 +17,9 @@ const BLANK = {
   state: "",
   postcode: "",
   country: "",
+  phone: "",
   is_default: false,
+  is_dellyman_pickup: false,
 };
 
 const inp = {
@@ -59,6 +63,7 @@ export default function BrandAddresses() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [deleting, setDeleting] = useState(null);
+  const [phoneValid, setPhoneValid] = useState(true);
 
   useEffect(() => {
     getAddresses()
@@ -73,6 +78,7 @@ export default function BrandAddresses() {
     setForm(BLANK);
     setMode("add");
     setError("");
+    setPhoneValid(true);
   };
   const openEdit = (addr) => {
     setForm({
@@ -83,10 +89,13 @@ export default function BrandAddresses() {
       state: addr.state || "",
       postcode: addr.postcode || "",
       country: addr.country,
+      phone: addr.phone || "",
       is_default: addr.is_default,
+      is_dellyman_pickup: addr.is_dellyman_pickup,
     });
     setMode({edit: addr});
     setError("");
+    setPhoneValid(true);
   };
   const closeForm = () => {
     setMode(null);
@@ -98,19 +107,31 @@ export default function BrandAddresses() {
       setError("Label, address, city and country are required.");
       return;
     }
+    if (form.is_dellyman_pickup && !form.phone) {
+      setError("A phone number is required for your Dellyman pickup address.");
+      return;
+    }
+    if (form.phone && !phoneValid) {
+      setError("Enter a valid phone number.");
+      return;
+    }
     setSaving(true);
     setError("");
     try {
       if (mode === "add") {
         const created = await createAddress(form);
         setAddresses((prev) => {
-          let next = form.is_default ? prev.map((a) => ({...a, is_default: false})) : [...prev];
+          let next = prev;
+          if (form.is_default) next = next.map((a) => ({...a, is_default: false}));
+          if (form.is_dellyman_pickup) next = next.map((a) => ({...a, is_dellyman_pickup: false}));
           return [...next, created];
         });
       } else {
         const updated = await updateAddress(mode.edit.id, form);
         setAddresses((prev) => {
-          let next = form.is_default ? prev.map((a) => ({...a, is_default: false})) : [...prev];
+          let next = prev;
+          if (form.is_default) next = next.map((a) => ({...a, is_default: false}));
+          if (form.is_dellyman_pickup) next = next.map((a) => ({...a, is_dellyman_pickup: false}));
           return next.map((a) => (a.id === mode.edit.id ? updated : a));
         });
       }
@@ -144,6 +165,16 @@ export default function BrandAddresses() {
     try {
       await setDefaultAddress(addr.id);
       setAddresses((prev) => prev.map((a) => ({...a, is_default: a.id === addr.id})));
+    } catch (e) {
+      alert(e.message);
+    }
+  };
+
+  const handleSetDellymanPickup = async (addr) => {
+    if (addr.is_dellyman_pickup) return;
+    try {
+      await setDellymanPickupAddress(addr.id);
+      setAddresses((prev) => prev.map((a) => ({...a, is_dellyman_pickup: a.id === addr.id})));
     } catch (e) {
       alert(e.message);
     }
@@ -280,6 +311,28 @@ export default function BrandAddresses() {
             />
           </div>
         </div>
+        <div>
+          <Label>
+            Phone{" "}
+            <span
+              style={{
+                color: "rgba(255,255,255,0.2)",
+                fontWeight: 400,
+                textTransform: "none",
+                letterSpacing: 0,
+              }}>
+              {form.is_dellyman_pickup
+                ? "(required — the courier uses this to contact you for pickup)"
+                : "(used by the courier if this is your Dellyman pickup address)"}
+            </span>
+          </Label>
+          <PhoneInput
+            value={form.phone}
+            onChange={(e164) => setForm({...form, phone: e164})}
+            onValidChange={setPhoneValid}
+            defaultCountry="NG"
+          />
+        </div>
 
         {/* Default checkbox */}
         <label
@@ -298,6 +351,26 @@ export default function BrandAddresses() {
           />
           <span style={{color: "rgba(255,255,255,0.5)", fontSize: 12}}>
             Set as default delivery address
+          </span>
+        </label>
+
+        {/* Dellyman pickup checkbox */}
+        <label
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 9,
+            cursor: "pointer",
+            userSelect: "none",
+          }}>
+          <input
+            type="checkbox"
+            checked={form.is_dellyman_pickup}
+            onChange={(e) => setForm({...form, is_dellyman_pickup: e.target.checked})}
+            style={{width: 16, height: 16, accentColor: "#ef4444", cursor: "pointer"}}
+          />
+          <span style={{color: "rgba(255,255,255,0.5)", fontSize: 12}}>
+            Use as my Dellyman pickup address — couriers collect orders from here
           </span>
         </label>
 
@@ -569,6 +642,21 @@ export default function BrandAddresses() {
                       Default
                     </span>
                   )}
+                  {addr.is_dellyman_pickup && (
+                    <span
+                      style={{
+                        background: "rgba(59,130,246,0.1)",
+                        color: "#3b82f6",
+                        fontSize: 9,
+                        fontWeight: 900,
+                        letterSpacing: "0.1em",
+                        textTransform: "uppercase",
+                        padding: "3px 9px",
+                        borderRadius: 99,
+                      }}>
+                      Dellyman Pickup
+                    </span>
+                  )}
                 </div>
                 {/* Actions */}
                 <div style={{display: "flex", gap: 8, flexShrink: 0}}>
@@ -623,6 +711,41 @@ export default function BrandAddresses() {
                         strokeWidth="2"
                         viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </button>
+                  )}
+                  {/* Set Dellyman pickup */}
+                  {!addr.is_dellyman_pickup && (
+                    <button
+                      onClick={() => handleSetDellymanPickup(addr)}
+                      title="Use as Dellyman pickup address"
+                      style={{
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                        color: "rgba(255,255,255,0.3)",
+                        padding: 0,
+                        transition: "color 0.15s",
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.color = "#3b82f6")}
+                      onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.3)")}>
+                      <svg
+                        width="14"
+                        height="14"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        viewBox="0 0 24 24">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"
+                        />
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M3 6h11v11H5a2 2 0 01-2-2V6zM14 9h4l3 3v5h-7V9z"
+                        />
                       </svg>
                     </button>
                   )}
@@ -688,6 +811,11 @@ export default function BrandAddresses() {
               {addr.country && (
                 <p style={{color: "rgba(255,255,255,0.3)", fontSize: 11, margin: "3px 0 0"}}>
                   {addr.country}
+                </p>
+              )}
+              {addr.phone && (
+                <p style={{color: "rgba(255,255,255,0.3)", fontSize: 11, margin: "3px 0 0"}}>
+                  {addr.phone}
                 </p>
               )}
             </div>

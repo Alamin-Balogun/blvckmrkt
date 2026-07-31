@@ -119,6 +119,7 @@ export const deleteOrder = (id) => req("DELETE", `/orders/${id}`);
 export const confirmPayment = (id) => req("POST", `/orders/${id}/confirm-payment`);
 export const rejectPayment = (id, reason) =>
   req("POST", `/orders/${id}/reject-payment`, reason ? {reason} : {});
+export const sendReceiptEmail = (id) => req("POST", `/orders/${id}/send-receipt`);
 
 // ✅ Order Payout Management (NEW - grouped with orders)
 export const adminGetPayoutInfo = (orderId) => req("GET", `/orders/${orderId}/payout-info`);

@@ -885,25 +885,34 @@ const handleShippingMethodSelect = useCallback((method) => {
 
   const deliveryCost = useMemo(() => {
     if (deliveryMode !== "delivery" || !selectedShippingMethod) return 0;
-    
+
     const rawPrice = Number(
       selectedShippingMethod.flat_rate ||
       selectedShippingMethod.base_price ||
       selectedShippingMethod.rate ||
       0
     );
-    
+
     const fromCurrency = (
       selectedShippingMethod._currency ||
       selectedShippingMethod.currency_code ||
       selectedShippingMethod.currency ||
       baseCurrency
     ).toUpperCase();
-    
+
     return convert ? convert(rawPrice, fromCurrency) : rawPrice;
   }, [selectedShippingMethod, deliveryMode, convert, baseCurrency]);
 
-  const orderTotal = Math.max(0, itemTotal + deliveryCost);
+  // Tax — the platform's commission, re-surfaced here as a checkout line
+  // (mirrors Shop.jsx's Buy Now flow and the server's itemTax() in create_order.go).
+  const tax = useMemo(() => {
+    const raw = Math.max(0, (product.compare_price || 0) - product.price) * qty;
+    return convert ? convert(raw, baseCurrency) : raw;
+  }, [product.compare_price, product.price, qty, convert, baseCurrency]);
+
+  const totalWeight = (product.weight || 2) * qty;
+
+  const orderTotal = Math.max(0, itemTotal + deliveryCost + tax);
   const hasDiscount = product.compare_price > 0 && product.compare_price !== product.price;
 
   const validate = () => {
@@ -2775,17 +2784,22 @@ if (payment.method === "flutterwave") {
                         {deliveryCost === 0 ? "FREE" : fmtMoney(deliveryCost)}
                       </span>
                     </div>
-                    {hasDiscount && (
+                    {tax > 0 && (
                       <div
-                        style={{display: "flex", justifyContent: "space-between", marginBottom: 10}}>
-                        <span style={{color: "#22c55e", fontSize: 12, fontWeight: 700}}>
-                          You Save
-                        </span>
-                        <span style={{color: "#22c55e", fontSize: 12, fontWeight: 700}}>
-                          {fmtMoney((product.compare_price - product.price) * qty)}
+                        style={{display: "flex", justifyContent: "space-between", marginBottom: 8}}>
+                        <span style={{color: "rgba(255,255,255,0.4)", fontSize: 12}}>Tax</span>
+                        <span style={{color: "rgba(255,255,255,0.7)", fontSize: 12, fontWeight: 700}}>
+                          {fmtMoney(tax)}
                         </span>
                       </div>
                     )}
+                    <div
+                      style={{display: "flex", justifyContent: "space-between", marginBottom: 10}}>
+                      <span style={{color: "rgba(255,255,255,0.4)", fontSize: 12}}>Weight</span>
+                      <span style={{color: "rgba(255,255,255,0.7)", fontSize: 12, fontWeight: 700}}>
+                        {totalWeight.toFixed(1)} kg
+                      </span>
+                    </div>
                     <div
                       style={{height: 1, background: "rgba(255,255,255,0.08)", margin: "0 0 10px"}}
                     />
@@ -3366,6 +3380,9 @@ export default function BrandWishlist() {
                           lineHeight: 1.1,
                         }}>
                         {fmtMoney(price)}
+                      </p>
+                      <p style={{color: "rgba(255,255,255,0.25)", fontSize: 9, margin: "2px 0 0"}}>
+                        {(prod.weight || 2).toFixed(1)} kg
                       </p>
                     </div>
                     <button

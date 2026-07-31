@@ -35,7 +35,6 @@ type LoginResponse struct {
 	Token     string              `json:"token"`
 	User      models.UserResponse `json:"user"`
 	Dashboard string              `json:"dashboard"`
-	HasPlan   bool                `json:"has_plan"`
 }
 
 // ── POST /api/auth/send-verification ─────────────────────────────────────────
@@ -243,38 +242,18 @@ func Login(c *gin.Context) {
 		return
 	}
 
+	// Brand dashboard access is gated purely by verification status now (see
+	// middleware.RequireVerifiedBrand) — there's no subscription requirement
+	// to log in, so brand accounts always land on their dashboard.
 	dashboard := "/dashboard/buyer"
-	hasPlan   := true
-
 	if user.AccountType == models.AccountBrand {
-		var brand models.Brand
-		brandResult := database.DB.Where("user_id = ?", user.ID).First(&brand)
-
-		if brandResult.Error != nil {
-			dashboard = "/subscribe"
-			hasPlan   = false
-		} else {
-			// ✅ Changed to string comparison
-			noSub := brand.SubscriptionPlan == "none" ||
-				brand.SubscriptionStatus == models.SubStatusNone ||
-				brand.SubscriptionStatus == models.SubStatusExpired ||
-				brand.SubscriptionStatus == models.SubStatusCancelled
-
-			if noSub {
-				dashboard = "/subscribe"
-				hasPlan   = false
-			} else {
-				dashboard = "/dashboard/brand"
-				hasPlan   = true
-			}
-		}
+		dashboard = "/dashboard/brand"
 	}
 
 	utils.OK(c, "Login successful", LoginResponse{
 		Token:     token,
 		User:      user.ToResponse(),
 		Dashboard: dashboard,
-		HasPlan:   hasPlan,
 	})
 }
 

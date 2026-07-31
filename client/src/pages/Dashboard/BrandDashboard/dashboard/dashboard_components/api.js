@@ -60,6 +60,8 @@ export const listBrandOrders = (params = {}) => {
 export const getBrandOrder = (id) => req("GET", `/brand/orders/${id}`);
 export const updateBrandOrderStatus = (id, status) =>
   req("PATCH", `/brand/orders/${id}/status`, {status});
+export const confirmDellymanPickup = (deliveryId) =>
+  req("POST", `/brand/orders/dellyman/${deliveryId}/confirm-pickup`);
 
 export const listMyOrders = (params = {}) => {
   const q = new URLSearchParams(params).toString();
@@ -114,6 +116,7 @@ export const createAddress = (body) => req("POST", "/brand/addresses", body);
 export const updateAddress = (id, body) => req("PUT", `/brand/addresses/${id}`, body);
 export const deleteAddress = (id) => req("DELETE", `/brand/addresses/${id}`);
 export const setDefaultAddress = (id) => req("PATCH", `/brand/addresses/${id}/default`);
+export const setDellymanPickupAddress = (id) => req("PATCH", `/brand/addresses/${id}/dellyman-pickup`);
 
 // ── Image upload ──────────────────────────────────────────────────────────────
 export async function uploadProductImage(file) {

@@ -13,7 +13,9 @@ package utils
 
 import (
 	"fmt"
+	"html"
 	"os"
+	"strings"
 
 	"github.com/Alamin-Balogun/blvckmrkt/config"
 	"github.com/resend/resend-go/v3"
@@ -126,7 +128,7 @@ func SendVerificationEmail(toEmail, firstName, otp string) error {
 	}
 
 	client := resend.NewClient(apiKey)
-	from   := fmt.Sprintf("%s <%s>", config.App.EmailFromName, config.App.EmailFrom)
+	from := fmt.Sprintf("%s <%s>", config.App.EmailFromName, config.App.EmailFrom)
 
 	params := &resend.SendEmailRequest{
 		From:    from,
@@ -215,6 +217,7 @@ func buildVerificationEmail(firstName, otp string) string {
 </body>
 </html>`, firstName, otp)
 }
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Order Confirmation Email
 // ─────────────────────────────────────────────────────────────────────────────
@@ -652,16 +655,16 @@ func buildBrandOrderNotificationEmail(d BrandOrderNotificationData) string {
 
 // PayoutEmailData holds everything needed to render the payout email.
 type PayoutEmailData struct {
-	BrandName    string
-	BrandEmail   string
-	Amount       float64
-	Currency     string
-	OrderID      string
-	Reference    string
-	Gateway      string
-	AccountName  string
+	BrandName     string
+	BrandEmail    string
+	Amount        float64
+	Currency      string
+	OrderID       string
+	Reference     string
+	Gateway       string
+	AccountName   string
 	AccountNumber string
-	BankName     string
+	BankName      string
 }
 
 // SendPayoutEmail notifies a brand that BLVCKMRKT has sent them a payout.
@@ -824,10 +827,10 @@ func buildPayoutEmail(d PayoutEmailData) string {
 
 // PartnershipWelcomeData holds everything needed for the welcome email.
 type PartnershipWelcomeData struct {
-	BrandName  string
-	FirstName  string
-	Email      string
-	SignedAt   string // formatted date string
+	BrandName string
+	FirstName string
+	Email     string
+	SignedAt  string // formatted date string
 }
 
 // SendPartnershipWelcomeEmail sends a branded welcome + approval email to the brand.
@@ -838,7 +841,7 @@ func SendPartnershipWelcomeEmail(d PartnershipWelcomeData) error {
 	}
 
 	client := resend.NewClient(apiKey)
-	from   := fmt.Sprintf("%s <%s>", config.App.EmailFromName, config.App.EmailFrom)
+	from := fmt.Sprintf("%s <%s>", config.App.EmailFromName, config.App.EmailFrom)
 
 	params := &resend.SendEmailRequest{
 		From:    from,
@@ -1069,11 +1072,631 @@ func buildPartnershipWelcomeEmail(d PartnershipWelcomeData) string {
 </body>
 </html>`,
 		// Args in order of %s placeholders:
-		d.FirstName,    // "Hello %s,"
-		d.BrandName,    // "received and recorded your agreement for %s"
-		d.BrandName,    // "Verifying that %s is a real..."
-		d.BrandName,    // "Your Agreement Record" → Brand row
-		d.SignedAt,     // Signed date
-		d.Email,        // "we'll reach out directly to %s"
+		d.FirstName, // "Hello %s,"
+		d.BrandName, // "received and recorded your agreement for %s"
+		d.BrandName, // "Verifying that %s is a real..."
+		d.BrandName, // "Your Agreement Record" → Brand row
+		d.SignedAt,  // Signed date
+		d.Email,     // "we'll reach out directly to %s"
+	)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Admin-Issued Receipt Email
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ReceiptEmailData holds everything needed to render the buyer-facing receipt
+// an admin sends on demand from the order drawer.
+type ReceiptEmailData struct {
+	ToEmail       string
+	BuyerName     string
+	OrderID       string // display id, e.g. "ORD-0042"
+	CreatedAt     string // pre-formatted date
+	PaymentMethod string
+	PaymentStatus string
+	Address       string // single formatted line, or empty
+	Subtotal      float64
+	Tax           float64
+	ShippingFee   float64
+	Total         float64
+	Currency      string
+	Items         []OrderConfirmationItem
+}
+
+// SendReceiptEmail sends a branded, printable-style receipt to the buyer —
+// triggered manually by an admin from the order drawer, not automatically.
+func SendReceiptEmail(d ReceiptEmailData) error {
+	apiKey := os.Getenv("RESEND_API_KEY")
+	if apiKey == "" {
+		return fmt.Errorf("RESEND_API_KEY not set")
+	}
+
+	client := resend.NewClient(apiKey)
+	from := fmt.Sprintf("%s <%s>", config.App.EmailFromName, config.App.EmailFrom)
+
+	params := &resend.SendEmailRequest{
+		From:    from,
+		To:      []string{d.ToEmail},
+		Subject: fmt.Sprintf("Your Receipt – %s", d.OrderID),
+		Html:    buildReceiptEmail(d),
+	}
+
+	_, err := client.Emails.Send(params)
+	if err != nil {
+		return fmt.Errorf("resend send failed: %w", err)
+	}
+	return nil
+}
+
+func buildReceiptEmail(d ReceiptEmailData) string {
+	currencySymbol := d.Currency
+	if d.Currency == "NGN" {
+		currencySymbol = "₦"
+	}
+
+	itemRows := ""
+	for _, item := range d.Items {
+		sizeLabel := ""
+		if item.Size != "" && item.Size != "—" {
+			sizeLabel = fmt.Sprintf(` <span style="color:rgba(255,255,255,0.3);font-size:11px;">/ %s</span>`, item.Size)
+		}
+		itemRows += fmt.Sprintf(`
+		<tr>
+		  <td style="padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.05);">
+		    <table width="100%%" cellpadding="0" cellspacing="0">
+		      <tr>
+		        <td style="width:44px;vertical-align:top;">%s</td>
+		        <td style="padding-left:12px;vertical-align:top;">
+		          <p style="color:#fff;font-size:13px;margin:0 0 3px;font-weight:600;">%s%s</p>
+		          <p style="color:rgba(255,255,255,0.3);font-size:11px;margin:0;">Qty: %d · %s%.2f each</p>
+		        </td>
+		        <td style="text-align:right;vertical-align:top;white-space:nowrap;">
+		          <p style="color:#fff;font-size:13px;margin:0;font-weight:600;">%s%.2f</p>
+		        </td>
+		      </tr>
+		    </table>
+		  </td>
+		</tr>`,
+			imageTag(item.ImageURL),
+			item.Name, sizeLabel,
+			item.Quantity, currencySymbol, item.UnitPrice,
+			currencySymbol, item.Total,
+		)
+	}
+
+	addressRow := ""
+	if d.Address != "" {
+		addressRow = fmt.Sprintf(`
+		<tr><td style="padding-bottom:20px;">
+		  <p style="color:rgba(255,255,255,0.3);font-size:10px;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;margin:0 0 6px;">Billed To</p>
+		  <p style="color:#fff;font-size:13px;font-weight:600;margin:0 0 3px;">%s</p>
+		  <p style="color:rgba(255,255,255,0.45);font-size:12px;margin:0;line-height:1.6;">%s</p>
+		</td></tr>`, html.EscapeString(d.BuyerName), html.EscapeString(d.Address))
+	}
+
+	return fmt.Sprintf(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Your Receipt</title>
+</head>
+<body style="margin:0;padding:0;background:#0a0a0a;font-family:system-ui,-apple-system,sans-serif;">
+  <table width="100%%" cellpadding="0" cellspacing="0" style="background:#0a0a0a;padding:40px 20px;">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0"
+        style="background:#111;border:1px solid rgba(255,255,255,0.08);border-radius:16px;overflow:hidden;max-width:560px;width:100%%;">
+
+        <!-- Header -->
+        <tr><td style="background:#0d0d0d;padding:24px 36px;border-bottom:1px solid rgba(255,255,255,0.06);">
+          <table width="100%%" cellpadding="0" cellspacing="0"><tr>
+            <td><img src="https://blvckmrktng.com/logo.png" alt="BLVCKMRKT" height="30" style="display:block;height:30px;width:auto;"></td>
+            <td align="right">
+              <span style="color:#ef4444;font-size:11px;font-weight:900;letter-spacing:0.2em;text-transform:uppercase;">Receipt</span>
+            </td>
+          </tr></table>
+        </td></tr>
+
+        <!-- Body -->
+        <tr><td style="padding:36px 36px 0;">
+          <table width="100%%" cellpadding="0" cellspacing="0">
+
+            <tr><td style="padding-bottom:22px;">
+              <p style="color:rgba(255,255,255,0.4);font-size:11px;font-weight:700;letter-spacing:0.3em;text-transform:uppercase;margin:0 0 10px;">
+                Order %s
+              </p>
+              <h1 style="color:#fff;font-size:22px;margin:0 0 8px;line-height:1.3;">
+                Thanks for shopping with us, %s
+              </h1>
+              <p style="color:rgba(255,255,255,0.4);font-size:12px;margin:0;">
+                %s &nbsp;·&nbsp; %s (%s)
+              </p>
+            </td></tr>
+
+            %s
+
+            <tr><td style="padding-bottom:20px;">
+              <div style="height:1px;background:rgba(255,255,255,0.06);"></div>
+            </td></tr>
+
+            <tr><td>
+              <p style="color:rgba(255,255,255,0.35);font-size:10px;font-weight:700;letter-spacing:0.25em;text-transform:uppercase;margin:0 0 4px;">
+                Items
+              </p>
+              <table width="100%%" cellpadding="0" cellspacing="0">
+                %s
+              </table>
+            </td></tr>
+
+            <tr><td style="padding:20px 0 28px;">
+              <div style="background:#0d0d0d;border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:16px 20px;">
+                <table width="100%%" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td style="color:rgba(255,255,255,0.4);font-size:12px;padding-bottom:8px;">Subtotal</td>
+                    <td align="right" style="color:rgba(255,255,255,0.6);font-size:12px;padding-bottom:8px;">%s%.2f</td>
+                  </tr>
+                  <tr>
+                    <td style="color:rgba(255,255,255,0.4);font-size:12px;padding-bottom:8px;">Tax</td>
+                    <td align="right" style="color:rgba(255,255,255,0.6);font-size:12px;padding-bottom:8px;">%s%.2f</td>
+                  </tr>
+                  <tr>
+                    <td style="color:rgba(255,255,255,0.4);font-size:12px;padding-bottom:12px;">Shipping</td>
+                    <td align="right" style="color:rgba(255,255,255,0.6);font-size:12px;padding-bottom:12px;">%s%.2f</td>
+                  </tr>
+                  <tr>
+                    <td style="border-top:1px solid rgba(255,255,255,0.07);padding-top:12px;color:#fff;font-size:14px;font-weight:700;">Total</td>
+                    <td align="right" style="border-top:1px solid rgba(255,255,255,0.07);padding-top:12px;color:#ef4444;font-size:16px;font-weight:900;">%s%.2f</td>
+                  </tr>
+                </table>
+              </div>
+            </td></tr>
+
+          </table>
+        </td></tr>
+
+        <!-- Footer -->
+        <tr><td style="background:#0d0d0d;padding:20px 36px;border-top:1px solid rgba(255,255,255,0.06);">
+          <p style="color:rgba(255,255,255,0.2);font-size:11px;margin:0;line-height:1.6;">
+            © 2026 BLVCKMRKT &nbsp;·&nbsp; Receipt issued by BLVCKMRKT admin. Keep this for your records.
+          </p>
+        </td></tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+		d.OrderID,
+		html.EscapeString(d.BuyerName),
+		d.CreatedAt, d.PaymentMethod, d.PaymentStatus,
+		addressRow,
+		itemRows,
+		currencySymbol, d.Subtotal,
+		currencySymbol, d.Tax,
+		currencySymbol, d.ShippingFee,
+		currencySymbol, d.Total,
+	)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Goods-Delivered Letter — sent to a brand once Dellyman confirms their
+// shipment for an order was delivered, mirroring the buyer-facing receipt.
+// ─────────────────────────────────────────────────────────────────────────────
+
+type GoodsDeliveredData struct {
+	BrandName      string
+	BrandEmail     string
+	OrderID        string // display id
+	BuyerName      string
+	DeliveredAt    string // pre-formatted
+	TrackingID     string
+	CourierCompany string
+	Currency       string
+	Items          []OrderConfirmationItem
+}
+
+// SendGoodsDeliveredEmail notifies a brand that their items in an order have
+// been successfully delivered to the buyer via Dellyman.
+func SendGoodsDeliveredEmail(d GoodsDeliveredData) error {
+	apiKey := os.Getenv("RESEND_API_KEY")
+	if apiKey == "" {
+		return fmt.Errorf("RESEND_API_KEY not set")
+	}
+
+	client := resend.NewClient(apiKey)
+	from := fmt.Sprintf("%s <%s>", config.App.EmailFromName, config.App.EmailFrom)
+
+	params := &resend.SendEmailRequest{
+		From:    from,
+		To:      []string{d.BrandEmail},
+		Subject: fmt.Sprintf("✅ Goods Delivered — Order %s", d.OrderID),
+		Html:    buildGoodsDeliveredEmail(d),
+	}
+
+	_, err := client.Emails.Send(params)
+	if err != nil {
+		return fmt.Errorf("resend send failed: %w", err)
+	}
+	return nil
+}
+
+func buildGoodsDeliveredEmail(d GoodsDeliveredData) string {
+	itemRows := ""
+	for _, item := range d.Items {
+		sizeLabel := ""
+		if item.Size != "" && item.Size != "—" {
+			sizeLabel = fmt.Sprintf(" · Size %s", item.Size)
+		}
+		itemRows += fmt.Sprintf(`
+		<tr>
+		  <td style="padding:0 0 14px;">
+		    <table width="100%%" cellpadding="0" cellspacing="0"><tr>
+		      <td style="width:44px;vertical-align:top;">%s</td>
+		      <td style="padding-left:12px;vertical-align:top;">
+		        <p style="color:#fff;font-size:13px;margin:0 0 3px;font-weight:600;">%s%s</p>
+		        <p style="color:rgba(255,255,255,0.3);font-size:11px;margin:0;">Qty: %d</p>
+		      </td>
+		    </tr></table>
+		  </td>
+		</tr>`, imageTag(item.ImageURL), item.Name, sizeLabel, item.Quantity)
+	}
+
+	return fmt.Sprintf(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Goods Delivered</title>
+</head>
+<body style="margin:0;padding:0;background:#0a0a0a;font-family:system-ui,-apple-system,sans-serif;">
+  <table width="100%%" cellpadding="0" cellspacing="0" style="background:#0a0a0a;padding:40px 20px;">
+    <tr><td align="center">
+      <table width="520" cellpadding="0" cellspacing="0"
+        style="background:#111;border:1px solid rgba(255,255,255,0.08);border-radius:16px;overflow:hidden;max-width:520px;width:100%%;">
+
+        <tr><td style="background:#0d0d0d;padding:28px 36px;border-bottom:1px solid rgba(255,255,255,0.06);">
+          <table width="100%%" cellpadding="0" cellspacing="0"><tr>
+            <td><img src="https://blvckmrktng.com/logo.png" alt="BLVCKMRKT" height="28" style="display:block;height:28px;width:auto;"></td>
+            <td align="right">
+              <span style="background:rgba(34,197,94,0.15);color:#22c55e;font-size:10px;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;padding:5px 12px;border-radius:20px;border:1px solid rgba(34,197,94,0.3);">
+                Delivered
+              </span>
+            </td>
+          </tr></table>
+        </td></tr>
+
+        <tr><td style="padding:36px 36px 28px;">
+
+          <p style="color:rgba(255,255,255,0.4);font-size:11px;font-weight:700;letter-spacing:0.3em;text-transform:uppercase;margin:0 0 12px;">
+            Letter of Goods Delivery
+          </p>
+          <h1 style="color:#fff;font-size:22px;margin:0 0 10px;line-height:1.3;">
+            Your goods reached %s safely 📦
+          </h1>
+          <p style="color:rgba(255,255,255,0.45);font-size:13px;line-height:1.7;margin:0 0 24px;">
+            This confirms that the item(s) below, from your order
+            <strong style="color:#fff;">%s</strong>, were picked up by
+            %s and have now been successfully delivered to the buyer.
+          </p>
+
+          <table width="100%%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;">
+            %s
+          </table>
+
+          <div style="background:#0a0a0a;border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:16px 20px;margin-bottom:20px;">
+            <table width="100%%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="color:rgba(255,255,255,0.4);font-size:12px;padding-bottom:8px;">Tracking ID</td>
+                <td align="right" style="color:rgba(255,255,255,0.8);font-size:12px;font-weight:600;padding-bottom:8px;font-family:monospace;">%s</td>
+              </tr>
+              <tr>
+                <td style="color:rgba(255,255,255,0.4);font-size:12px;">Delivered</td>
+                <td align="right" style="color:rgba(255,255,255,0.8);font-size:12px;font-weight:600;">%s</td>
+              </tr>
+            </table>
+          </div>
+
+          <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:14px 18px;">
+            <p style="color:rgba(255,255,255,0.3);font-size:12px;margin:0;line-height:1.6;">
+              💰 Your payout for this order will be processed per the usual schedule from your Brand Studio dashboard.
+            </p>
+          </div>
+
+        </td></tr>
+
+        <tr><td style="background:#0d0d0d;padding:20px 36px;border-top:1px solid rgba(255,255,255,0.06);">
+          <p style="color:rgba(255,255,255,0.2);font-size:11px;margin:0;line-height:1.6;">
+            © 2026 BLVCKMRKT &nbsp;·&nbsp; Automated message — please do not reply.
+          </p>
+        </td></tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+		d.BrandName, d.OrderID, d.CourierCompany,
+		itemRows,
+		d.TrackingID, d.DeliveredAt,
+	)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Dellyman Manual-Cancellation Alert — Dellyman has no cancel-order API
+// endpoint, so once a booked/picked shipment's order is cancelled on our
+// side, ops needs to be told to go cancel it by hand in the Dellyman app.
+// ─────────────────────────────────────────────────────────────────────────────
+
+type DellymanCancelAlertData struct {
+	OrderID         string // display id
+	DellymanOrderID string
+	TrackingID      string
+	CourierCompany  string
+	BrandName       string
+	BuyerName       string
+	BuyerPhone      string
+	DeliveryAddress string
+	CancelledAt     string // pre-formatted
+}
+
+// SendDellymanCancelAlertEmail alerts ops that a Dellyman booking needs to be
+// cancelled by hand — sent to config.App.SupportEmail, not the buyer/brand.
+func SendDellymanCancelAlertEmail(d DellymanCancelAlertData) error {
+	apiKey := os.Getenv("RESEND_API_KEY")
+	if apiKey == "" {
+		return fmt.Errorf("RESEND_API_KEY not set")
+	}
+
+	client := resend.NewClient(apiKey)
+	from := fmt.Sprintf("%s <%s>", config.App.EmailFromName, config.App.EmailFrom)
+	to := config.App.SupportEmail
+	if to == "" {
+		return fmt.Errorf("SupportEmail not configured")
+	}
+
+	params := &resend.SendEmailRequest{
+		From:    from,
+		To:      []string{to},
+		Subject: fmt.Sprintf("⚠️ Manually cancel Dellyman booking — Order %s", d.OrderID),
+		Html:    buildDellymanCancelAlertEmail(d),
+	}
+
+	_, err := client.Emails.Send(params)
+	if err != nil {
+		return fmt.Errorf("resend send failed: %w", err)
+	}
+	return nil
+}
+
+func buildDellymanCancelAlertEmail(d DellymanCancelAlertData) string {
+	row := func(label, value string) string {
+		if value == "" {
+			value = "—"
+		}
+		return fmt.Sprintf(`
+		<tr>
+		  <td style="color:rgba(255,255,255,0.4);font-size:12px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.05);">%s</td>
+		  <td align="right" style="color:rgba(255,255,255,0.85);font-size:12px;font-weight:600;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.05);">%s</td>
+		</tr>`, html.EscapeString(label), html.EscapeString(value))
+	}
+
+	return fmt.Sprintf(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Manual Dellyman Cancellation Needed</title>
+</head>
+<body style="margin:0;padding:0;background:#0a0a0a;font-family:system-ui,-apple-system,sans-serif;">
+  <table width="100%%" cellpadding="0" cellspacing="0" style="background:#0a0a0a;padding:40px 20px;">
+    <tr><td align="center">
+      <table width="520" cellpadding="0" cellspacing="0"
+        style="background:#111;border:1px solid rgba(239,68,68,0.2);border-radius:16px;overflow:hidden;max-width:520px;width:100%%;">
+
+        <tr><td style="background:#0d0d0d;padding:24px 36px;border-bottom:1px solid rgba(255,255,255,0.06);">
+          <table width="100%%" cellpadding="0" cellspacing="0"><tr>
+            <td><img src="https://blvckmrktng.com/logo.png" alt="BLVCKMRKT" height="26" style="display:block;height:26px;width:auto;"></td>
+            <td align="right">
+              <span style="background:rgba(239,68,68,0.15);color:#ef4444;font-size:10px;font-weight:800;letter-spacing:0.15em;text-transform:uppercase;padding:5px 12px;border-radius:20px;border:1px solid rgba(239,68,68,0.35);">
+                Action Needed
+              </span>
+            </td>
+          </tr></table>
+        </td></tr>
+
+        <tr><td style="padding:32px 36px 28px;">
+          <h1 style="color:#fff;font-size:20px;margin:0 0 10px;line-height:1.3;">
+            Cancel this booking in the Dellyman app
+          </h1>
+          <p style="color:rgba(255,255,255,0.5);font-size:13px;line-height:1.7;margin:0 0 24px;">
+            Order <strong style="color:#fff;">%s</strong> was cancelled on BLVCKMRKT, but Dellyman has
+            no API to cancel a courier booking remotely — this one already had a rider assigned, so it
+            needs to be cancelled by hand in the Dellyman dashboard/app using the details below.
+          </p>
+
+          <div style="background:#0a0a0a;border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:6px 18px;margin-bottom:20px;">
+            <table width="100%%" cellpadding="0" cellspacing="0">
+              %s
+            </table>
+          </div>
+
+          <div style="background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.2);border-radius:10px;padding:14px 18px;">
+            <p style="color:rgba(255,255,255,0.5);font-size:12px;margin:0;line-height:1.7;">
+              Once cancelled on Dellyman's side, no further action is needed here — the order is already marked cancelled on BLVCKMRKT.
+            </p>
+          </div>
+        </td></tr>
+
+        <tr><td style="background:#0d0d0d;padding:18px 36px;border-top:1px solid rgba(255,255,255,0.06);">
+          <p style="color:rgba(255,255,255,0.2);font-size:11px;margin:0;line-height:1.6;">
+            © 2026 BLVCKMRKT &nbsp;·&nbsp; Internal ops alert.
+          </p>
+        </td></tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+		d.OrderID,
+		row("Order", d.OrderID)+
+			row("Dellyman Order ID", d.DellymanOrderID)+
+			row("Tracking ID", d.TrackingID)+
+			row("Courier", d.CourierCompany)+
+			row("Brand", d.BrandName)+
+			row("Buyer", d.BuyerName)+
+			row("Buyer Phone", d.BuyerPhone)+
+			row("Delivery Address", d.DeliveryAddress)+
+			row("Cancelled At", d.CancelledAt),
+	)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Admin Broadcast Email — sent when an admin notification's channel includes
+// "email". Renders the same title/body/image an admin composes for the
+// in-app notification as a proper branded email instead of a bare string.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// AdminBroadcastData holds everything needed to render an admin broadcast email.
+type AdminBroadcastData struct {
+	ToEmail   string
+	FirstName string
+	Title     string
+	Body      string
+	ImageURL  string
+	TypeLabel string // "News" | "Drop" | "Order" | "System"
+}
+
+// SendAdminBroadcastEmail sends an admin-composed message to one recipient.
+func SendAdminBroadcastEmail(d AdminBroadcastData) error {
+	apiKey := os.Getenv("RESEND_API_KEY")
+	if apiKey == "" {
+		return fmt.Errorf("RESEND_API_KEY not set")
+	}
+
+	client := resend.NewClient(apiKey)
+	from := fmt.Sprintf("%s <%s>", config.App.EmailFromName, config.App.EmailFrom)
+
+	params := &resend.SendEmailRequest{
+		From:    from,
+		To:      []string{d.ToEmail},
+		Subject: d.Title,
+		Html:    buildAdminBroadcastEmail(d),
+	}
+
+	_, err := client.Emails.Send(params)
+	if err != nil {
+		return fmt.Errorf("resend send failed: %w", err)
+	}
+	return nil
+}
+
+// bodyToParagraphs escapes free-text admin input and renders each
+// newline-separated block as its own <p>, so line breaks the admin typed
+// are preserved without letting raw HTML/script through.
+func bodyToParagraphs(body string) string {
+	lines := strings.Split(strings.TrimSpace(body), "\n")
+	var out strings.Builder
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		out.WriteString(fmt.Sprintf(
+			`<p style="color:rgba(255,255,255,0.6);font-size:14px;line-height:1.8;margin:0 0 14px;">%s</p>`,
+			html.EscapeString(line),
+		))
+	}
+	return out.String()
+}
+
+func buildAdminBroadcastEmail(d AdminBroadcastData) string {
+	greeting := "Hey there,"
+	if d.FirstName != "" {
+		greeting = fmt.Sprintf("Hey %s,", html.EscapeString(d.FirstName))
+	}
+
+	typeLabel := d.TypeLabel
+	if typeLabel == "" {
+		typeLabel = "News"
+	}
+
+	imageBlock := ""
+	if d.ImageURL != "" {
+		imageBlock = fmt.Sprintf(`
+		<tr><td style="padding-bottom:24px;">
+		  <img src="%s" alt="" width="488" style="display:block;width:100%%;max-width:488px;height:auto;border-radius:12px;border:1px solid rgba(255,255,255,0.08);">
+		</td></tr>`, html.EscapeString(d.ImageURL))
+	}
+
+	return fmt.Sprintf(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>%s</title>
+</head>
+<body style="margin:0;padding:0;background:#0a0a0a;font-family:system-ui,-apple-system,sans-serif;">
+  <table width="100%%" cellpadding="0" cellspacing="0" style="background:#0a0a0a;padding:40px 20px;">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0"
+        style="background:#111;border:1px solid rgba(255,255,255,0.08);border-radius:16px;overflow:hidden;max-width:560px;width:100%%;">
+
+        <!-- Header -->
+        <tr><td style="background:#0d0d0d;padding:28px 36px;border-bottom:1px solid rgba(255,255,255,0.06);">
+          <table width="100%%" cellpadding="0" cellspacing="0"><tr>
+            <td>
+              <span style="font-family:Georgia,serif;font-size:22px;font-weight:900;color:#fff;letter-spacing:0.06em;">
+                BLVCK<span style="color:#ef4444;">MRKT</span>
+              </span>
+            </td>
+            <td align="right">
+              <span style="background:rgba(239,68,68,0.12);color:#ef4444;font-size:10px;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;padding:5px 12px;border-radius:20px;border:1px solid rgba(239,68,68,0.3);">
+                %s
+              </span>
+            </td>
+          </tr></table>
+        </td></tr>
+
+        <!-- Body -->
+        <tr><td style="padding:36px 36px 28px;">
+          <table width="100%%" cellpadding="0" cellspacing="0">
+
+            <tr><td style="padding-bottom:18px;">
+              <p style="color:rgba(255,255,255,0.4);font-size:11px;font-weight:700;letter-spacing:0.3em;text-transform:uppercase;margin:0 0 12px;">
+                %s
+              </p>
+              <h1 style="color:#fff;font-size:24px;margin:0;line-height:1.3;">
+                %s
+              </h1>
+            </td></tr>
+
+            %s
+
+            <tr><td>
+              %s
+            </td></tr>
+
+          </table>
+        </td></tr>
+
+        <!-- Footer -->
+        <tr><td style="background:#0d0d0d;padding:20px 36px;border-top:1px solid rgba(255,255,255,0.06);">
+          <p style="color:rgba(255,255,255,0.2);font-size:11px;margin:0;line-height:1.6;">
+            © 2026 BLVCKMRKT &nbsp;·&nbsp; You're receiving this because you have a BLVCKMRKT account.
+          </p>
+        </td></tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+		html.EscapeString(d.Title),
+		typeLabel,
+		greeting,
+		html.EscapeString(d.Title),
+		imageBlock,
+		bodyToParagraphs(d.Body),
 	)
 }

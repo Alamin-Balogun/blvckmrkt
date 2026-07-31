@@ -309,6 +309,13 @@ function NotifDetailModal({notif, onClose, onMarkRead, onDelete}) {
         </div>
 
         <div style={{padding: "20px 22px"}}>
+          {notif.image_url && (
+            <img
+              src={notif.image_url}
+              alt=""
+              style={{width: "100%", maxHeight: 220, objectFit: "cover", borderRadius: 12, marginBottom: 16, display: "block"}}
+            />
+          )}
           <div
             style={{
               background: "rgba(255,255,255,0.03)",
@@ -734,19 +741,27 @@ export default function Notifications({autoOpenId, onClearOpen}) {
                     gap: 14,
                     cursor: "default",
                   }}>
-                  <div
-                    style={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: "50%",
-                      background: cfg.bg,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      flexShrink: 0,
-                    }}>
-                    {cfg.icon}
-                  </div>
+                  {n.image_url ? (
+                    <img
+                      src={n.image_url}
+                      alt=""
+                      style={{width: 40, height: 40, borderRadius: 10, objectFit: "cover", flexShrink: 0}}
+                    />
+                  ) : (
+                    <div
+                      style={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: "50%",
+                        background: cfg.bg,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                      }}>
+                      {cfg.icon}
+                    </div>
+                  )}
                   <div style={{flex: 1, minWidth: 0}}>
                     <div
                       style={{

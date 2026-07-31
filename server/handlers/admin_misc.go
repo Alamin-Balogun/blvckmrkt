@@ -30,6 +30,7 @@ func AdminListNotifications(c *gin.Context) {
 		Type      string    `json:"type"`
 		Title     string    `json:"title"`
 		Body      string    `json:"body"`
+		ImageURL  string    `json:"image_url"`
 		IsRead    bool      `json:"is_read"`
 		RefType   string    `json:"ref_type"`
 		CreatedAt time.Time `json:"created_at"`
@@ -39,7 +40,7 @@ func AdminListNotifications(c *gin.Context) {
 		Select(`n.id, n.user_id,
 		        CONCAT(u.first_name, ' ', u.last_name) AS user_name,
 		        u.email AS user_email,
-		        n.type, n.title, n.body, n.is_read, n.ref_type, n.created_at`).
+		        n.type, n.title, n.body, n.image_url, n.is_read, n.ref_type, n.created_at`).
 		Joins("LEFT JOIN users u ON u.id = n.user_id").
 		Where("n.deleted_at IS NULL")
 
@@ -58,14 +59,17 @@ func AdminListNotifications(c *gin.Context) {
 }
 
 // ── POST /api/admin/notifications ────────────────────────────────────────────
-// Send notification to one user or multiple users by target group
+// Send notification to one user or multiple users by target group, via the
+// in-app notification bell, email (Resend), or both.
 func AdminSendNotification(c *gin.Context) {
 	var body struct {
-		Title        string `json:"title"         binding:"required"`
-		Body         string `json:"body"          binding:"required"`
-		Type         string `json:"type"`         // news|drop|order|system
-		Target       string `json:"target"`       // all|buyers|brands|user
+		Title        string `json:"title"           binding:"required"`
+		Body         string `json:"body"            binding:"required"`
+		Type         string `json:"type"`           // news|drop|order|system
+		Target       string `json:"target"`         // all|buyers|brands|user
 		TargetUserID *uint  `json:"target_user_id"` // required when target="user"
+		Channel      string `json:"channel"`        // app|email|both
+		ImageURL     string `json:"image_url"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		utils.BadRequest(c, "title and body are required", nil)
@@ -77,15 +81,39 @@ func AdminSendNotification(c *gin.Context) {
 	if body.Target == "" {
 		body.Target = "all"
 	}
+	if body.Channel == "" {
+		body.Channel = "app"
+	}
+	sendInApp := body.Channel == "app" || body.Channel == "both"
+	sendEmail := body.Channel == "email" || body.Channel == "both"
 
 	notifType := models.NotifNews
+	typeLabel := "News"
 	switch body.Type {
 	case "drop":
 		notifType = models.NotifDrop
+		typeLabel = "Drop"
 	case "order":
 		notifType = models.NotifOrder
+		typeLabel = "Order"
 	case "system":
 		notifType = models.NotifSystem
+		typeLabel = "System"
+	}
+
+	emailRecipient := func(u models.User) (sent bool) {
+		if u.Email == "" {
+			return false
+		}
+		err := utils.SendAdminBroadcastEmail(utils.AdminBroadcastData{
+			ToEmail:   u.Email,
+			FirstName: u.FirstName,
+			Title:     body.Title,
+			Body:      body.Body,
+			ImageURL:  body.ImageURL,
+			TypeLabel: typeLabel,
+		})
+		return err == nil
 	}
 
 	// ── PERSONAL: Send to ONE specific user ──────────────────────────────────
@@ -100,15 +128,23 @@ func AdminSendNotification(c *gin.Context) {
 			return
 		}
 
-		if err := database.DB.Create(&models.Notification{
-			UserID:  u.ID,
-			Type:    notifType,
-			Title:   body.Title,
-			Body:    body.Body,
-			RefType: "admin",
-		}).Error; err != nil {
-			utils.InternalError(c, "Failed to send notification")
-			return
+		if sendInApp {
+			if err := database.DB.Create(&models.Notification{
+				UserID:   u.ID,
+				Type:     notifType,
+				Title:    body.Title,
+				Body:     body.Body,
+				ImageURL: body.ImageURL,
+				RefType:  "admin",
+			}).Error; err != nil {
+				utils.InternalError(c, "Failed to send notification")
+				return
+			}
+		}
+
+		emailsSent := 0
+		if sendEmail && emailRecipient(u) {
+			emailsSent = 1
 		}
 
 		userName := strings.TrimSpace(u.FirstName + " " + u.LastName)
@@ -116,7 +152,10 @@ func AdminSendNotification(c *gin.Context) {
 			userName = u.Email
 		}
 		logActivity(c, "notification", &u.ID, "send", "Personal notification → "+userName)
-		utils.Created(c, "Notification sent", gin.H{"recipients": 1})
+		utils.Created(c, "Notification sent", gin.H{
+			"recipients":  1,
+			"emails_sent": emailsSent,
+		})
 		return
 	}
 
@@ -139,25 +178,38 @@ func AdminSendNotification(c *gin.Context) {
 		return
 	}
 
-	// Batch insert notifications
-	notifications := make([]models.Notification, len(users))
-	for i, u := range users {
-		notifications[i] = models.Notification{
-			UserID:  u.ID,
-			Type:    notifType,
-			Title:   body.Title,
-			Body:    body.Body,
-			RefType: "admin",
+	if sendInApp {
+		notifications := make([]models.Notification, len(users))
+		for i, u := range users {
+			notifications[i] = models.Notification{
+				UserID:   u.ID,
+				Type:     notifType,
+				Title:    body.Title,
+				Body:     body.Body,
+				ImageURL: body.ImageURL,
+				RefType:  "admin",
+			}
+		}
+		if err := database.DB.CreateInBatches(notifications, 100).Error; err != nil {
+			utils.InternalError(c, "Failed to send notifications")
+			return
 		}
 	}
 
-	if err := database.DB.CreateInBatches(notifications, 100).Error; err != nil {
-		utils.InternalError(c, "Failed to send notifications")
-		return
+	emailsSent := 0
+	if sendEmail {
+		for _, u := range users {
+			if emailRecipient(u) {
+				emailsSent++
+			}
+		}
 	}
 
 	logActivity(c, "notification", nil, "send", "Broadcast → "+body.Target)
-	utils.Created(c, "Notification sent", gin.H{"recipients": len(users)})
+	utils.Created(c, "Notification sent", gin.H{
+		"recipients":  len(users),
+		"emails_sent": emailsSent,
+	})
 }
 
 // ── DELETE /api/admin/notifications/:id ──────────────────────────────────────

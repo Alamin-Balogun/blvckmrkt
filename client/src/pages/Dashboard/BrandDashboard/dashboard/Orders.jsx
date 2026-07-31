@@ -4,6 +4,7 @@ import {
   listBrandOrders,
   listMyOrders,
   updateBrandOrderStatus,
+  confirmDellymanPickup,
 } from "../dashboard/dashboard_components/api";
 import {usePlatformSettings} from "../dashboard/dashboard_components/platformsettingscontext";
 
@@ -359,6 +360,7 @@ function IncomingOrders() {
   const [filter, setFilter] = useState("");
   const [toast, setToast] = useState("");
   const [updating, setUpdating] = useState(null);
+  const [confirmingPickup, setConfirmingPickup] = useState(null);
   const [expanded, setExpanded] = useState(null);
 
   const load = (params = {}) => {
@@ -391,6 +393,28 @@ function IncomingOrders() {
       showToast("Error: " + e.message);
     } finally {
       setUpdating(null);
+    }
+  };
+
+  const handleConfirmPickup = async (orderId, deliveryId) => {
+    setConfirmingPickup(deliveryId);
+    try {
+      await confirmDellymanPickup(deliveryId);
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.order_id === orderId
+            ? {
+                ...o,
+                dellyman_delivery: {...o.dellyman_delivery, status: "picked", can_confirm_pickup: false},
+              }
+            : o
+        )
+      );
+      showToast("Pickup confirmed — the courier is on the way");
+    } catch (e) {
+      showToast("Error: " + e.message);
+    } finally {
+      setConfirmingPickup(null);
     }
   };
 
@@ -800,6 +824,94 @@ function IncomingOrders() {
                           })}
                         </div>
                       )}
+
+                      {/* ── Confirm Handoff to Dellyman Courier ── */}
+                      {order.dellyman_delivery?.can_confirm_pickup && (
+                        <div style={{marginTop: 12}}>
+                          <button
+                            onClick={() => {
+                              if (confirm("Confirm you've handed this package to the Dellyman rider?")) {
+                                handleConfirmPickup(order.order_id, order.dellyman_delivery.delivery_id);
+                              }
+                            }}
+                            disabled={confirmingPickup === order.dellyman_delivery.delivery_id}
+                            style={{
+                              background: "transparent",
+                              border: "1px solid rgba(139,92,246,0.35)",
+                              color: "#a78bfa",
+                              fontSize: 11,
+                              fontWeight: 700,
+                              letterSpacing: "0.1em",
+                              textTransform: "uppercase",
+                              padding: "7px 14px",
+                              borderRadius: 7,
+                              cursor: confirmingPickup === order.dellyman_delivery.delivery_id ? "not-allowed" : "pointer",
+                              transition: "all 0.15s",
+                              opacity: confirmingPickup === order.dellyman_delivery.delivery_id ? 0.5 : 1,
+                            }}
+                            onMouseEnter={(e) => {
+                              if (confirmingPickup !== order.dellyman_delivery.delivery_id) {
+                                e.currentTarget.style.background = "rgba(139,92,246,0.1)";
+                              }
+                            }}
+                            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+                            {confirmingPickup === order.dellyman_delivery.delivery_id
+                              ? "Confirming…"
+                              : "📦 Confirm Handoff to Courier"}
+                          </button>
+                        </div>
+                      )}
+
+                      {/* ── Cancel Order ── */}
+                      {order.can_cancel && (
+                        <div style={{marginTop: 12}}>
+                          <button
+                            onClick={() => {
+                              if (confirm("Cancel this order? This cannot be undone.")) {
+                                handleStatus(order.order_id, "cancelled");
+                              }
+                            }}
+                            disabled={isUpdating}
+                            style={{
+                              background: "transparent",
+                              border: "1px solid rgba(239,68,68,0.3)",
+                              color: "rgba(239,68,68,0.7)",
+                              fontSize: 11,
+                              fontWeight: 700,
+                              letterSpacing: "0.1em",
+                              textTransform: "uppercase",
+                              padding: "7px 14px",
+                              borderRadius: 7,
+                              cursor: isUpdating ? "not-allowed" : "pointer",
+                              transition: "all 0.15s",
+                              opacity: isUpdating ? 0.5 : 1,
+                            }}
+                            onMouseEnter={(e) => {
+                              if (!isUpdating) {
+                                e.currentTarget.style.background = "rgba(239,68,68,0.1)";
+                                e.currentTarget.style.color = "#ef4444";
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = "transparent";
+                              e.currentTarget.style.color = "rgba(239,68,68,0.7)";
+                            }}>
+                            {isUpdating ? "Updating…" : "Cancel Order"}
+                          </button>
+                        </div>
+                      )}
+                      {!order.can_cancel &&
+                        order.status !== "delivered" &&
+                        order.status !== "cancelled" && (
+                          <p
+                            style={{
+                              color: "rgba(255,255,255,0.2)",
+                              fontSize: 10,
+                              margin: "10px 0 0",
+                            }}>
+                            The 3-day cancellation window for this order has passed.
+                          </p>
+                        )}
                     </div>
                   </motion.div>
                 )}

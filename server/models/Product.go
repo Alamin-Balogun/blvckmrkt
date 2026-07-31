@@ -39,6 +39,10 @@ type Product struct {
 
 	Status     ProductStatus  `gorm:"type:enum('draft','active','sold_out','archived');default:'draft'" json:"status"`
 	IsFeatured bool           `gorm:"default:false"                         json:"is_featured"`
+	// Weight (kg) — packed weight, used to price Dellyman courier bookings.
+	// Products created before this field existed default to 2kg (see the
+	// column default below, which backfills all pre-existing rows).
+	Weight float64 `gorm:"type:decimal(6,2);not null;default:2" json:"weight"`
 	Tags       string         `gorm:"type:varchar(500)"                     json:"tags,omitempty"` // comma-separated
 	CreatedAt  time.Time      `                                              json:"created_at"`
 	UpdatedAt  time.Time      `                                              json:"updated_at"`

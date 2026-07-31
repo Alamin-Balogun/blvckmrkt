@@ -12,6 +12,7 @@ import (
 	"github.com/Alamin-Balogun/blvckmrkt/models"
 	"github.com/Alamin-Balogun/blvckmrkt/utils"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 // ── GET /api/admin/users ──────────────────────────────────────────────────────
@@ -412,46 +413,66 @@ func AdminCreateUser(c *gin.Context) {
 		accountType = models.AccountBrand
 	}
 
-	user := models.User{
-		FirstName:   strings.TrimSpace(req.FirstName),
-		LastName:    strings.TrimSpace(req.LastName),
-		Email:       strings.ToLower(strings.TrimSpace(req.Email)),
-		Password:    string(hashed),
-		AccountType: accountType,
-	}
-	if err := database.DB.Create(&user).Error; err != nil {
-		utils.InternalError(c, "Failed to create user")
-		return
-	}
+	var user models.User
 
-	if accountType == models.AccountUser {
-		buyer := models.Buyer{UserID: user.ID, Phone: req.Phone}
-		database.DB.Create(&buyer)
-	} else if accountType == models.AccountBrand {
-		brandName := req.BrandName
-		if brandName == "" {
-			brandName = req.FirstName + " " + req.LastName
+	// Create the user + brand/buyer profile in one transaction so a failure
+	// on the second insert (e.g. a slug collision) can't leave an orphaned
+	// `users` row behind — an orphan like that permanently occupies the email
+	// with no working profile attached, so the account can never be created
+	// (self-signup and future admin-create attempts both get "already exists")
+	// and there's no functioning brand/buyer to show for it either.
+	txErr := database.DB.Transaction(func(tx *gorm.DB) error {
+		user = models.User{
+			FirstName:   strings.TrimSpace(req.FirstName),
+			LastName:    strings.TrimSpace(req.LastName),
+			Email:       strings.ToLower(strings.TrimSpace(req.Email)),
+			Password:    string(hashed),
+			AccountType: accountType,
 		}
-		verStatus := models.VerificationPending
-		if req.AutoVerify {
-			verStatus = models.VerificationVerified
+		if err := tx.Create(&user).Error; err != nil {
+			return fmt.Errorf("failed to create user: %w", err)
 		}
-		brand := models.Brand{
-			UserID:             user.ID,
-			BrandName:          brandName,
-			Slug:               utils.Slugify(brandName),
-			Description:        req.Description,
-			LogoURL:            req.LogoURL,
-			Website:            req.Website,
-			Instagram:          req.Instagram,
-			Facebook:           req.Facebook,
-			Twitter:            req.Twitter,
-			TikTok:             req.TikTok,
-			Category:           req.Category,
-			Phone:              req.Phone,
-			VerificationStatus: verStatus,
+
+		if accountType == models.AccountUser {
+			buyer := models.Buyer{UserID: user.ID, Phone: req.Phone}
+			if err := tx.Create(&buyer).Error; err != nil {
+				return fmt.Errorf("failed to create buyer profile: %w", err)
+			}
+		} else if accountType == models.AccountBrand {
+			brandName := req.BrandName
+			if brandName == "" {
+				brandName = req.FirstName + " " + req.LastName
+			}
+			verStatus := models.VerificationPending
+			if req.AutoVerify {
+				verStatus = models.VerificationVerified
+			}
+			brand := models.Brand{
+				UserID:             user.ID,
+				BrandName:          brandName,
+				Slug:               utils.Slugify(brandName),
+				Description:        req.Description,
+				LogoURL:            req.LogoURL,
+				Website:            req.Website,
+				Instagram:          req.Instagram,
+				Facebook:           req.Facebook,
+				Twitter:            req.Twitter,
+				TikTok:             req.TikTok,
+				Category:           req.Category,
+				Phone:              req.Phone,
+				VerificationStatus: verStatus,
+			}
+			if err := tx.Create(&brand).Error; err != nil {
+				return fmt.Errorf("failed to create brand profile (name/slug may already be in use): %w", err)
+			}
 		}
-		database.DB.Create(&brand)
+		return nil
+	})
+
+	if txErr != nil {
+		log.Printf("[admin_create_user] transaction failed: %v", txErr)
+		utils.InternalError(c, "Failed to create account: "+txErr.Error())
+		return
 	}
 
 	utils.OK(c, "Account created successfully", gin.H{"user_id": user.ID})
