@@ -1262,6 +1262,7 @@ if (!loading && verificationStatus && BLOCKED_STATUSES.includes(verificationStat
 
   return (
     <div style={{
+      position: "relative",
       height: "100vh",
       overflow: "hidden",
       background: "#070707",
@@ -1276,6 +1277,40 @@ if (!loading && verificationStatus && BLOCKED_STATUSES.includes(verificationStat
         select option { background: #111 !important; color: #fff !important; }
         select option:checked { background: #ef4444 !important; color: #fff !important; }
       `}</style>
+
+      {/* Faint terminal scanline + dot-grid texture */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          pointerEvents: "none",
+          zIndex: 0,
+          backgroundImage:
+            "repeating-linear-gradient(0deg, rgba(239,68,68,0.02) 0px, rgba(239,68,68,0.02) 1px, transparent 1px, transparent 3px), radial-gradient(circle at 1.5px 1.5px, rgba(239,68,68,0.06) 1px, transparent 0)",
+          backgroundSize: "auto, 26px 26px",
+        }}
+      />
+      {/* Terminal-window corner brackets */}
+      {[
+        {top: 8, left: 8, borderWidth: "2px 0 0 2px"},
+        {top: 8, right: 8, borderWidth: "2px 2px 0 0"},
+        {bottom: 8, left: 8, borderWidth: "0 0 2px 2px"},
+        {bottom: 8, right: 8, borderWidth: "0 2px 2px 0"},
+      ].map((pos, i) => (
+        <span
+          key={i}
+          style={{
+            position: "absolute",
+            width: 16,
+            height: 16,
+            borderStyle: "solid",
+            borderColor: "rgba(239,68,68,0.35)",
+            zIndex: 1,
+            pointerEvents: "none",
+            ...pos,
+          }}
+        />
+      ))}
 
       {/* Logout Modal */}
       <AnimatePresence>

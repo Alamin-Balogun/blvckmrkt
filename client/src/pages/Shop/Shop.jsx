@@ -6,7 +6,7 @@ import NewlyDropped from "../Shop/shop_components/newlydropped";
 import {ShopContentProvider, useShopContent} from "../Shop/shop_components/shopcontentcontext";
 
 function ShopInner() {
-  const pageTitle = useShopContent("page_title", "Shop");
+  const pageTitle = useShopContent("page_title", "THE MARKET");
   const pageHeaderImage = useShopContent(
     "page_header_image",
     "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1600&q=80",

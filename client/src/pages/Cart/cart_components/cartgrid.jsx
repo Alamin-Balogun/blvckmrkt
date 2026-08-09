@@ -104,22 +104,6 @@ function BrandShippingPanel({brand, brandId, items, onSelect, selected, fmtMoney
         };
         setData(safe);
         setFetched(true);
-        // Auto-select the first available method if none selected yet
-        if (!selected) {
-          if (dellymanMode) {
-            onSelect(brandId, DELLYMAN_DELIVERY_METHOD);
-          } else {
-            const methods = [
-              ...safe.zones.flatMap((z) =>
-                (z.methods ?? []).map((m) => ({...m, type: "zone", zone: z}))
-              ),
-              ...safe.local.map((m) => ({...m, type: "local"})),
-            ];
-            if (methods.length > 0) {
-              onSelect(brandId, methods[0]);
-            }
-          }
-        }
       })
       .catch(() => {
         setData({zones: [], local: [], pickups: []});
@@ -128,6 +112,32 @@ function BrandShippingPanel({brand, brandId, items, onSelect, selected, fmtMoney
       })
       .finally(() => setLoading(false));
   }, [brandId]); // eslint-disable-line
+
+  // Keeps the selected method in sync with dellymanMode — not just once on
+  // mount. dellymanMode is fetched separately (platform-wide setting) and
+  // can resolve after this panel's own shipping fetch already ran, so a
+  // mount-only auto-select would lock in a brand's own zone/local method
+  // even after the page learns delivery_mode is actually "dellyman".
+  // Pickup selections are always left alone — they're brand-handled either way.
+  useEffect(() => {
+    if (!fetched) return;
+    if (selected?.pickupMode) return;
+
+    if (dellymanMode) {
+      if (selected?.type !== "dellyman") onSelect(brandId, DELLYMAN_DELIVERY_METHOD);
+      return;
+    }
+
+    if (selected?.type === "dellyman" || !selected) {
+      const methods = [
+        ...(shippingData?.zones?.flatMap((z) =>
+          (z.methods ?? []).map((m) => ({...m, type: "zone", zone: z}))
+        ) ?? []),
+        ...(shippingData?.local?.map((m) => ({...m, type: "local"})) ?? []),
+      ];
+      onSelect(brandId, methods[0] ?? null);
+    }
+  }, [fetched, dellymanMode, selected]); // eslint-disable-line
 
   const handleToggle = useCallback(() => {
     setOpen((v) => !v);
@@ -920,10 +930,10 @@ export default function CartGrid() {
               style={{textAlign: "center", padding: "80px 0"}}>
               <p style={{fontFamily: "'Bebas Neue', sans-serif", fontSize: "1.8rem",
                 color: "rgba(255,255,255,0.2)", letterSpacing: "0.06em", marginBottom: 8}}>
-                Your cart is empty
+                No items acquired yet
               </p>
               <p style={{color: "rgba(255,255,255,0.2)", fontSize: 12, marginBottom: 24}}>
-                Add items from the shop to get started.
+                Browse the market to start acquiring.
               </p>
               <Link to="/shop" style={{
                 display: "inline-flex", alignItems: "center", gap: 8,
@@ -931,7 +941,7 @@ export default function CartGrid() {
                 letterSpacing: "0.22em", textTransform: "uppercase", padding: "12px 28px",
                 textDecoration: "none", borderRadius: 8,
               }}>
-                Browse Shop →
+                Browse The Market →
               </Link>
             </motion.div>
           ) : (
@@ -979,7 +989,7 @@ export default function CartGrid() {
                         color: "rgba(255,255,255,0.5)", fontSize: 10,
                         fontWeight: 900, letterSpacing: "0.18em", textTransform: "uppercase",
                       }}>
-                        Products in Cart
+                        Acquired Items
                       </span>
                     </div>
 

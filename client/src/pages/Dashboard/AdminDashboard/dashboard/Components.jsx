@@ -317,8 +317,9 @@ export function AdminSidebar({active, onNav, onLogout, admin, onClose}) {
                 margin: 0,
                 letterSpacing: "0.2em",
                 textTransform: "uppercase",
+                fontFamily: "'Space Mono', monospace",
               }}>
-              Admin Console
+              &gt; Admin Console
             </p>
           </div>
           {onClose && (
@@ -359,6 +360,7 @@ export function AdminSidebar({active, onNav, onLogout, admin, onClose}) {
                 textTransform: "uppercase",
                 padding: "0 10px",
                 marginBottom: 4,
+                fontFamily: "'Space Mono', monospace",
               }}>
               {group.group}
             </p>
@@ -541,13 +543,15 @@ export function AdminTopBar({title, subtitle, onMenuToggle}) {
         <div>
           <p
             style={{
-              color: "rgba(255,255,255,0.25)",
+              color: "rgba(239,68,68,0.55)",
               fontSize: 9,
               fontWeight: 700,
               letterSpacing: "0.24em",
               textTransform: "uppercase",
               margin: "0 0 2px",
+              fontFamily: "'Space Mono', monospace",
             }}>
+            {"> "}
             {dateStr}
           </p>
           <h1
@@ -594,8 +598,9 @@ export function AdminTopBar({title, subtitle, onMenuToggle}) {
             fontWeight: 700,
             letterSpacing: "0.12em",
             textTransform: "uppercase",
+            fontFamily: "'Space Mono', monospace",
           }}>
-          Admin
+          Admin // Online
         </span>
       </div>
     </div>

@@ -340,13 +340,15 @@ export default function TopBar({
         <div>
           <p
             style={{
-              color: "rgba(255,255,255,0.28)",
+              color: "rgba(239,68,68,0.55)",
               fontSize: 10,
               fontWeight: 700,
               letterSpacing: "0.24em",
               textTransform: "uppercase",
               marginBottom: 3,
+              fontFamily: "'Space Mono', monospace",
             }}>
+            {"> "}
             {dateStr}
           </p>
           <h1
@@ -814,13 +816,15 @@ export default function TopBar({
                     }}>
                     <p
                       style={{
-                        color: "rgba(255,255,255,0.2)",
+                        color: "rgba(239,68,68,0.5)",
                         fontSize: 9,
                         fontWeight: 700,
                         letterSpacing: "0.22em",
                         textTransform: "uppercase",
                         margin: "0 0 3px",
+                        fontFamily: "'Space Mono', monospace",
                       }}>
+                      {"> "}
                       {dateStr}
                     </p>
                     <p

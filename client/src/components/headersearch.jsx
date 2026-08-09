@@ -7,8 +7,9 @@
 // filter works, since there's no server-side brand search endpoint.
 //
 // Selecting a product jumps to the shop page with a `highlight` param that
-// productgrid.jsx scroll-and-pulses onto; selecting a brand filters the shop
-// page to that brand (productgrid.jsx already reads `brand_id` from the URL).
+// productgrid.jsx scroll-and-pulses onto; selecting a brand jumps to that
+// brand's own page (/brands/:slug), which already loads and filters to just
+// that brand's products.
 import {useState, useRef, useEffect, useCallback} from "react";
 import {createPortal} from "react-dom";
 import {useNavigate} from "react-router-dom";
@@ -112,7 +113,7 @@ export default function HeaderSearch({
   };
 
   const goToBrand = (b) => {
-    navigate(`/shop?brand_id=${b.id}`);
+    navigate(`/brands/${encodeURIComponent(b.slug)}`);
     close();
   };
 
@@ -212,7 +213,7 @@ export default function HeaderSearch({
                     onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.06)")}
                     onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
                     <img
-                      src={p.images?.[0]?.url}
+                      src={p.primary_image}
                       alt=""
                       style={{
                         width: 36,

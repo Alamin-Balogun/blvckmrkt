@@ -22,7 +22,6 @@ export default function Home() {
         <Navbar />
         <HeroSlider />
         <PerksStrip />
-        <WantedBoard />
         {/* Products come first on mobile so buyers don't have to scroll
             past the Drops/Brands/Culture trio to reach what they came for. */}
         <ProductSections />
@@ -33,6 +32,7 @@ export default function Home() {
         <ProductShowcase />
         <PromoBanner />
         <BlogSection />
+        <WantedBoard />
         <Services />
         <Newsletter />
         <Footer />

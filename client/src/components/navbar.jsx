@@ -2,8 +2,8 @@ import {useState, useEffect, useRef} from "react";
 import {useCartWishlist} from "./cartcontext";
 import {Link, useLocation, useNavigate} from "react-router-dom";
 import {motion, AnimatePresence} from "framer-motion";
-import logo from "../assets/logo.png";
 import HeaderSearch from "./headersearch";
+import SpinningLogo from "./SpinningLogo";
 
 // ── CMS defaults — shown before/if API doesn't return values ─────────────────
 const DEFAULT_MARQUEE_ITEMS = [
@@ -19,7 +19,7 @@ const BASE = (import.meta.env.VITE_API_URL ?? "") + "/api";
 const mainLinks = [
   {label: "Home", path: "/"},
   {label: "About Us", path: "/about"},
-  {label: "Shop", path: "/shop"},
+  {label: "The Market", path: "/shop"},
   {label: "Contact Us", path: "/contact"},
 ];
 
@@ -213,14 +213,12 @@ export default function Navbar() {
 
           {/* Logo Center */}
           <Link to="/" className="absolute left-1/2 -translate-x-1/2">
-            <motion.img
-              src={logo}
-              alt="BLVCKMRKT Logo"
-              className="h-28 w-auto object-contain"
+            <motion.div
               whileHover={{y: -3, scale: 1.03}}
               whileTap={{scale: 0.97}}
-              transition={{type: "spring", stiffness: 400, damping: 15}}
-            />
+              transition={{type: "spring", stiffness: 400, damping: 15}}>
+              <SpinningLogo color="white" size={112} />
+            </motion.div>
           </Link>
 
           {/* Right Icons — desktop */}
@@ -389,7 +387,7 @@ export default function Navbar() {
               <div className="sticky top-0 bg-black/80 backdrop-blur-md border-b border-white/10 z-10">
                 <div className="flex items-center justify-between px-6 py-5">
                   <Link to="/" onClick={() => setMenuOpen(false)}>
-                    <img src={logo} alt="BLVCKMRKT" className="h-12 w-auto object-contain" />
+                    <SpinningLogo color="white" size={48} />
                   </Link>
                   <button
                     onClick={() => setMenuOpen(false)}
@@ -518,7 +516,7 @@ export default function Navbar() {
                     },
                     {
                       to: "/cart",
-                      label: "Cart",
+                      label: "Acquired",
                       icon: (
                         <path
                           strokeLinecap="round"

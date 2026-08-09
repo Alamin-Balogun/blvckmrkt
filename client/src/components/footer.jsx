@@ -3,7 +3,7 @@ import {motion} from "framer-motion";
 import logo from "../assets/logo.png";
 
 const quickLinks = [
-  {label: "Shop All", to: "/shop"},
+  {label: "The Market", to: "/shop"},
   {label: "New Arrivals", to: "/shop?filter=new"},
   {label: "Drops", to: "/drops"},
   {label: "Top Brands", to: "/brands"},
