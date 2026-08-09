@@ -1,13 +1,89 @@
 package handlers
 
 import (
+	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/Alamin-Balogun/blvckmrkt/database"
 	"github.com/Alamin-Balogun/blvckmrkt/models"
 	"github.com/Alamin-Balogun/blvckmrkt/utils"
 	"github.com/gin-gonic/gin"
 )
+
+// dellymanStateAliases handles the few Dellyman state names that don't
+// normalize to the same key as the country-state-city library's spelling
+// (typos and concatenation on Dellyman's side) — mirrors
+// client/src/utils/dellymanLocations.js's STATE_ALIASES so both sides agree.
+var dellymanStateAliases = map[string]string{
+	"plataeu": "plateau",
+}
+
+// normalizeDellymanKey lowercases and strips everything but letters/digits,
+// then applies dellymanStateAliases — used to fuzzy-match state names
+// despite formatting differences ("Akwa Ibom" vs "AkwaIbom", "Abuja Federal
+// Capital Territory" vs "Federal Capital Territory").
+func normalizeDellymanKey(s string) string {
+	var b strings.Builder
+	for _, r := range strings.ToLower(s) {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+		}
+	}
+	key := b.String()
+	if alias, ok := dellymanStateAliases[key]; ok {
+		return alias
+	}
+	return key
+}
+
+// dellymanLocationSupported checks a state/city pair against Dellyman's own
+// known service-area list (the same live-fetched data merged into the
+// location dropdowns via GET /api/dellyman/locations) — not the account's
+// rate card, which can't be checked without a specific delivery destination
+// too. This just stops a brand from saving a pickup address in a place our
+// courier doesn't even recognize as serviceable; the live quote at checkout
+// remains the final word on whether a given route is actually priced.
+// Fails open (allows the save) if the cache hasn't warmed yet, so a
+// transient courier-API hiccup never blocks address saving outright.
+func dellymanLocationSupported(state, city string) (bool, string) {
+	dellymanLocationsMu.Lock()
+	cache := dellymanLocationsCache
+	dellymanLocationsMu.Unlock()
+
+	if len(cache) == 0 {
+		return true, ""
+	}
+
+	stateKey := normalizeDellymanKey(state)
+	if stateKey == "" {
+		return false, "Please select a state for this address."
+	}
+
+	var matchedState string
+	var cities []string
+	for dmState, dmCities := range cache {
+		dmKey := normalizeDellymanKey(dmState)
+		if dmKey == stateKey || strings.Contains(stateKey, dmKey) || strings.Contains(dmKey, stateKey) {
+			matchedState, cities = dmState, dmCities
+			break
+		}
+	}
+	if matchedState == "" {
+		return false, fmt.Sprintf("Our courier doesn't currently recognize %q as a serviceable state — please pick a different pickup address, or check back later.", state)
+	}
+
+	cityKey := normalizeDellymanKey(city)
+	if cityKey == "" {
+		return false, "Please select a city for this address."
+	}
+	for _, dmCity := range cities {
+		if normalizeDellymanKey(dmCity) == cityKey {
+			return true, ""
+		}
+	}
+	return false, fmt.Sprintf("Our courier doesn't recognize %q as a serviceable city in %s — please pick one of the suggested cities from the dropdown, or choose a different address.", city, matchedState)
+}
 
 // ── GET /api/brand/addresses ──────────────────────────────────────────────────
 func BrandListAddresses(c *gin.Context) {
@@ -45,6 +121,12 @@ func BrandCreateAddress(c *gin.Context) {
 	if req.IsDellymanPickup && req.Phone == "" {
 		utils.BadRequest(c, "A phone number is required for your Dellyman pickup address — the courier uses it to contact you", nil)
 		return
+	}
+	if req.IsDellymanPickup {
+		if ok, msg := dellymanLocationSupported(req.State, req.City); !ok {
+			utils.BadRequest(c, msg, nil)
+			return
+		}
 	}
 
 	// If marking as default, clear existing default first
@@ -122,6 +204,24 @@ func BrandUpdateAddress(c *gin.Context) {
 	if req.IsDellymanPickup && effectivePhone == "" {
 		utils.BadRequest(c, "A phone number is required for your Dellyman pickup address — the courier uses it to contact you", nil)
 		return
+	}
+
+	// Preserve the existing state/city when the request doesn't send one,
+	// same as effectivePhone above, so this check reflects the address's
+	// real location.
+	effectiveState := req.State
+	if effectiveState == "" {
+		effectiveState = addr.State
+	}
+	effectiveCity := req.City
+	if effectiveCity == "" {
+		effectiveCity = addr.City
+	}
+	if req.IsDellymanPickup {
+		if ok, msg := dellymanLocationSupported(effectiveState, effectiveCity); !ok {
+			utils.BadRequest(c, msg, nil)
+			return
+		}
 	}
 
 	if req.IsDefault && !addr.IsDefault {
@@ -213,6 +313,10 @@ func BrandSetDellymanPickupAddress(c *gin.Context) {
 	}
 	if addr.Phone == "" {
 		utils.BadRequest(c, "Add a phone number to this address first — the courier uses it to contact you for pickup", nil)
+		return
+	}
+	if ok, msg := dellymanLocationSupported(addr.State, addr.City); !ok {
+		utils.BadRequest(c, msg, nil)
 		return
 	}
 

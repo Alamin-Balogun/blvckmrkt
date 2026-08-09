@@ -11,6 +11,8 @@ import {usePlatformSettings} from "../dashboard/dashboard_components/platformset
 import {useCurrency} from "../../../../components/currencycontext";
 import {useGeo} from "../../../../utils/geo";
 import PhoneInput from "../../../../components/phoneinput";
+import {TypeaheadField} from "../../../../components/LocationTypeahead";
+import {useDellymanLocations, findDellymanCities, mergeCityNames} from "../../../../utils/dellymanLocations";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "https://blvckmrktng.com";
 
@@ -121,69 +123,19 @@ function CError({msg}) {
   ) : null;
 }
 
-function SearchSelect({options, value, onChange, placeholder, disabled}) {
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const triggerRef = useRef(null);
-  const dropdownRef = useRef(null);
-  const selected = useMemo(() => options.find(o => o.value === value), [options, value]);
-  const filtered = useMemo(() => {
-    if (!query.trim()) return options.slice(0, 250);
-    const q = query.toLowerCase();
-    return options.filter(o => o.label.toLowerCase().includes(q)).slice(0, 250);
-  }, [options, query]);
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e) => {
-      if (triggerRef.current && !triggerRef.current.contains(e.target) &&
-          dropdownRef.current && !dropdownRef.current.contains(e.target)) setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
-  useEffect(() => { if (!open) setQuery(""); }, [open]);
-  return (
-    <div style={{position: "relative"}}>
-      <button ref={triggerRef} type="button" disabled={disabled} onClick={() => setOpen(!open)}
-        style={{width:"100%",background:disabled?"rgba(255,255,255,0.02)":"rgba(255,255,255,0.04)",border:`1px solid ${open?"rgba(239,68,68,0.55)":"rgba(255,255,255,0.1)"}`,borderRadius:8,padding:"12px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,cursor:disabled?"not-allowed":"pointer",transition:"all 0.18s",outline:"none",fontFamily:"inherit"}}>
-        <span style={{fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:disabled?"rgba(255,255,255,0.18)":selected?"#fff":"rgba(255,255,255,0.28)"}}>
-          {selected ? selected.label : placeholder}
-        </span>
-        <svg style={{flexShrink:0,transform:open?"rotate(180deg)":"rotate(0deg)",transition:"transform 0.18s"}} width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="rgba(255,255,255,0.3)" strokeWidth="2.5">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/>
-        </svg>
-      </button>
-      {open && (
-        <div ref={dropdownRef} style={{position:"absolute",top:"100%",left:0,right:0,marginTop:6,background:"#181818",border:"1px solid rgba(255,255,255,0.14)",borderRadius:12,zIndex:99999,boxShadow:"0 24px 64px rgba(0,0,0,0.85)",overflow:"hidden",maxHeight:300}}>
-          <div style={{padding:"10px",borderBottom:"1px solid rgba(255,255,255,0.07)"}}>
-            <input autoFocus value={query} onChange={e => setQuery(e.target.value)} placeholder="Search…"
-              style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,padding:"8px 10px",color:"#fff",fontSize:12,outline:"none"}}/>
-          </div>
-          <div style={{maxHeight:260,overflowY:"auto"}}>
-            {filtered.length === 0 ? (
-              <div style={{padding:18,color:"rgba(255,255,255,0.25)",fontSize:12,textAlign:"center"}}>No results</div>
-            ) : filtered.map(opt => {
-              const isSel = opt.value === value;
-              return (
-                <button key={opt.value} type="button" onClick={() => { onChange(opt.value); setOpen(false); }}
-                  style={{width:"100%",textAlign:"left",border:"none",padding:"9px 14px",cursor:"pointer",fontSize:13,background:isSel?"rgba(239,68,68,0.1)":"transparent",color:isSel?"#ef4444":"rgba(255,255,255,0.72)",display:"flex",alignItems:"center",gap:9}}>
-                  <span style={{flex:1}}>{opt.label}</span>
-                  {isSel && <svg width="11" height="11" fill="none" stroke="#ef4444" strokeWidth="3" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ── Quick checkout modal ────────────────────────────────────────────────────────
 function QuickCheckout({product, size, qty, onClose}) {
   const {fmtMoney} = usePlatformSettings();
   const {convert, userCurrency, baseCurrency} = useCurrency();
   const {Country, State, City, loaded: geoLoaded} = useGeo();
+  const {states: dellymanStates} = useDellymanLocations();
+  const [dellymanMode, setDellymanMode] = useState(false);
+  useEffect(() => {
+    fetch(`${API_BASE}/api/checkout/delivery-mode`)
+      .then((r) => r.json())
+      .then((json) => setDellymanMode((json?.data ?? json)?.delivery_mode === "dellyman"))
+      .catch(() => setDellymanMode(false));
+  }, []);
 
   const paymentTimeoutRef = useRef(null);
   const paystackHandlerRef = useRef(null);
@@ -231,13 +183,16 @@ const back = () => {
 
   const stateOptions = useMemo(() => {
     if (!geoLoaded || !delivery.country_code) return [];
-    return State.getStatesOfCountry(delivery.country_code).map(s => ({value: s.isoCode, label: s.name}));
+    const all = State.getStatesOfCountry(delivery.country_code).map(s => ({value: s.isoCode, label: s.name}));
+    return all;
   }, [geoLoaded, State, delivery.country_code]);
 
   const cityOptions = useMemo(() => {
-    if (!geoLoaded || !delivery.country_code || !delivery.state_code) return [];
-    return City.getCitiesOfState(delivery.country_code, delivery.state_code).map(c => ({value: c.name, label: c.name}));
-  }, [geoLoaded, City, delivery.country_code, delivery.state_code]);
+    const libraryCities = (geoLoaded && delivery.country_code && delivery.state_code)
+      ? City.getCitiesOfState(delivery.country_code, delivery.state_code).map(c => c.name) : [];
+    const dmCities = delivery.country_code === "NG" ? findDellymanCities(dellymanStates, delivery.state_name) : [];
+    return mergeCityNames(libraryCities, dmCities);
+  }, [geoLoaded, City, delivery.country_code, delivery.state_code, dellymanStates, delivery.state_name]);
 
   const extractLocationFromMethod = useCallback((method) => {
     if (!method || !geoLoaded) return {};
@@ -713,13 +668,17 @@ const back = () => {
                       {/* Country */}
                       <div style={{marginBottom:12}}>
                         <CLabel>Country *</CLabel>
-                        <SearchSelect options={countryOptions} value={delivery.country_code}
-                          onChange={code => {
-                            const c = geoLoaded ? Country.getCountryByCode(code) : null;
-                            setDelivery(prev => ({...prev,country_code:code,country_name:c?.name||"",state_code:"",state_name:"",city:""}));
+                        <TypeaheadField options={countryOptions} text={delivery.country_name} hasError={!!errors.country}
+                          onTextChange={text => {
+                            const match = countryOptions.find(o => o.label.toLowerCase() === text.trim().toLowerCase());
+                            setDelivery(prev => ({...prev,country_name:text,country_code:match?match.value:""}));
                             setErrors(prev => ({...prev,country:null}));
                           }}
-                          placeholder="Select country…"/>
+                          onSelect={opt => {
+                            setDelivery(prev => ({...prev,country_code:opt.value,country_name:opt.label,state_code:"",state_name:"",city:""}));
+                            setErrors(prev => ({...prev,country:null}));
+                          }}
+                          placeholder="Type or select a country…"/>
                         <CError msg={errors.country}/>
                       </div>
 
@@ -751,29 +710,26 @@ const back = () => {
                           onChange={e => setDelivery({...delivery,apt:e.target.value})} onFocus={focusRed} onBlur={blurRed}/>
                       </div>
 
-                      {delivery.country_code && (
+                      {delivery.country_name && (
                         <div style={{marginBottom:12}}>
                           <CLabel>State / Region *</CLabel>
-                          <SearchSelect options={stateOptions} value={delivery.state_code}
-                            onChange={code => {
-                              const s = geoLoaded ? State.getStateByCodeAndCountry(code, delivery.country_code) : null;
-                              setDelivery({...delivery,state_code:code,state_name:s?.name||"",city:""});
+                          <TypeaheadField options={stateOptions} text={delivery.state_name}
+                            onTextChange={text => {
+                              const match = stateOptions.find(o => o.label.toLowerCase() === text.trim().toLowerCase());
+                              setDelivery(prev => ({...prev,state_name:text,state_code:match?match.value:""}));
                             }}
-                            placeholder="Select state…" disabled={!delivery.country_code}/>
+                            onSelect={opt => setDelivery(prev => ({...prev,state_code:opt.value,state_name:opt.label,city:""}))}
+                            placeholder="Type or select a state…"/>
                         </div>
                       )}
 
-                      {delivery.state_code && (
+                      {delivery.state_name && (
                         <div style={{marginBottom:12}}>
                           <CLabel>City *</CLabel>
-                          {cityOptions.length > 0 ? (
-                            <SearchSelect options={cityOptions} value={delivery.city}
-                              onChange={name => setDelivery({...delivery,city:name})}
-                              placeholder="Select city…" disabled={!delivery.state_code}/>
-                          ) : (
-                            <input style={inp(!!errors.city)} placeholder="Type city name…" value={delivery.city}
-                              onChange={e => setDelivery({...delivery,city:e.target.value})} onFocus={focusRed} onBlur={blurRed}/>
-                          )}
+                          <TypeaheadField options={cityOptions} text={delivery.city} hasError={!!errors.city}
+                            onTextChange={text => setDelivery(prev => ({...prev,city:text}))}
+                            onSelect={opt => setDelivery(prev => ({...prev,city:opt.label}))}
+                            placeholder="Type or select a city…"/>
                           <CError msg={errors.city}/>
                         </div>
                       )}

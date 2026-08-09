@@ -151,7 +151,14 @@
       "Bash(echo \"DEPLOY_DIFF_EXIT=$?\")",
       "Bash(git fetch *)",
       "Bash(git rev-list *)",
-      "Bash(gh repo *)"
+      "Bash(gh repo *)",
+      "Bash(hostnamectl)",
+      "Read(//tmp/**)",
+      "Bash(pip show *)",
+      "Bash(pip install *)",
+      "Bash(python3 -m pip --version)",
+      "Bash(python3 *)",
+      "Bash(awk -F: '$1>=965 && $1<=1350')"
     ]
   }
 }

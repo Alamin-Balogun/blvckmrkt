@@ -367,10 +367,10 @@ export default function WishlistGrid() {
                           className={`wl-cart-btn ${addedId === item.productId ? "added" : cartIds.includes(item.productId) ? "in-cart" : ""}`}
                           onClick={() => handleAddToCart(item)}>
                           {addedId === item.productId
-                            ? "✓ Added"
+                            ? "✓ Acquired"
                             : cartIds.includes(item.productId)
                               ? "In Cart"
-                              : "Add to Cart"}
+                              : "Acquire Item"}
                         </button>
                       ) : (
                         <span

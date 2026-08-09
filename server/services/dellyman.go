@@ -96,6 +96,38 @@ func GetVehicles() ([]DellymanVehicle, error) {
 	return out.Vehicles, nil
 }
 
+// ── States & Cities ──────────────────────────────────────────────────────────
+// Unlike GetQuotes/BookOrder/Vehicles, these two return a raw JSON array at
+// the top level — no ResponseCode/Message wrapper — discovered by probing
+// the API directly (undocumented in the public rest-api page).
+
+type DellymanState struct {
+	StateID string `json:"StateID"`
+	Name    string `json:"Name"`
+}
+
+func GetStates() ([]DellymanState, error) {
+	var out []DellymanState
+	if err := dellymanRequest(http.MethodGet, "/States", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+type DellymanCity struct {
+	CityID  string `json:"CityID"`
+	StateID string `json:"StateID"`
+	Name    string `json:"Name"`
+}
+
+func GetCities(stateID string) ([]DellymanCity, error) {
+	var out []DellymanCity
+	if err := dellymanRequest(http.MethodPost, "/Cities", map[string]string{"StateID": stateID}, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ── Quotes ─────────────────────────────────────────────────────────────────
 
 type QuoteRequest struct {

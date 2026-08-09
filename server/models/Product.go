@@ -44,6 +44,16 @@ type Product struct {
 	// column default below, which backfills all pre-existing rows).
 	Weight float64 `gorm:"type:decimal(6,2);not null;default:2" json:"weight"`
 	Tags       string         `gorm:"type:varchar(500)"                     json:"tags,omitempty"` // comma-separated
+
+	// ── The Vault ────────────────────────────────────────────────────────────
+	// Real access-gated "classified" items — IsVault products are always
+	// masked down to a locked stub by the shop handlers unless the request
+	// carries a valid unlock token (see handlers/vault.go), regardless of
+	// how they're fetched. VaultCodeHash is a bcrypt hash of the access
+	// code the admin sets, never serialized to any response.
+	IsVault       bool   `gorm:"default:false;index"    json:"is_vault"`
+	VaultCodeHash string `gorm:"type:varchar(100)"      json:"-"`
+
 	CreatedAt  time.Time      `                                              json:"created_at"`
 	UpdatedAt  time.Time      `                                              json:"updated_at"`
 	DeletedAt  gorm.DeletedAt `gorm:"index"                                 json:"-"`

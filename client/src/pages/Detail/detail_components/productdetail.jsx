@@ -1,5 +1,6 @@
 import {useState, useEffect, useCallback, useRef} from "react";
-import {useParams, Link, useNavigate} from "react-router-dom";
+import {useParams, Link, useNavigate, useSearchParams} from "react-router-dom";
+import VaultUnlockModal from "../../../components/vaultunlockmodal";
 import {motion, AnimatePresence} from "framer-motion";
 import {useCartWishlist, getToken} from "../../../components/cartcontext";
 import ProductCard, {PRODUCT_CARD_CSS} from "../../../components/ProductCard";
@@ -17,11 +18,18 @@ const tabs = ["Description", "Shipping", "Reviews"];
 export default function ProductDetail() {
   const {id: slug} = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   // ── API state ─────────────────────────────────────────────────────────────
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  // Vault items come back masked unless a valid vault_token is presented —
+  // see handlers/vault.go and shop.go's GetProduct. `locked` + `lockedId`
+  // drive the "ENTER CODE" screen below instead of the normal detail layout.
+  const [locked, setLocked] = useState(false);
+  const [lockedId, setLockedId] = useState(null);
+  const [showVaultUnlock, setShowVaultUnlock] = useState(false);
   const [reviews, setReviews] = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [related, setRelated] = useState([]);
@@ -63,9 +71,46 @@ export default function ProductDetail() {
   const isWished = product ? wishlistIds.includes(product.id) : false;
 
   // ── Fetch product ─────────────────────────────────────────────────────────
+  // Vault items require a valid vault_token (from the URL, e.g. right after
+  // unlocking) — if the response comes back locked, we now know the numeric
+  // product id and can check localStorage for a previously-earned token
+  // under that id (one retry, self-limiting: the retry's token can't differ
+  // from itself so it can't loop).
+  const fetchProduct = useCallback((slugParam, token) => {
+    const qs = token ? `?vault_token=${encodeURIComponent(token)}` : "";
+    fetch(`${API_BASE}/api/shop/products/${slugParam}${qs}`)
+      .then((r) => {
+        if (!r.ok) throw new Error("not found");
+        return r.json();
+      })
+      .then((json) => {
+        const data = json?.data ?? json;
+        if (data?.locked) {
+          const stored = localStorage.getItem(`vault_token_${data.id}`);
+          if (stored && stored !== token) {
+            fetchProduct(slugParam, stored);
+            return;
+          }
+          setLocked(true);
+          setLockedId(data.id);
+          setProduct(null);
+          setLoading(false);
+          return;
+        }
+        setLocked(false);
+        setProduct(data);
+        setLoading(false);
+      })
+      .catch(() => {
+        setError(true);
+        setLoading(false);
+      });
+  }, []);
+
   useEffect(() => {
     setLoading(true);
     setError(false);
+    setLocked(false);
     setActiveImg(0);
     setSize(null);
     setSelectedSizeId(null);
@@ -73,20 +118,8 @@ export default function ProductDetail() {
     setOpenSections({});
     setShipping(null);
 
-    fetch(`${API_BASE}/api/shop/products/${slug}`)
-      .then((r) => {
-        if (!r.ok) throw new Error("not found");
-        return r.json();
-      })
-      .then((json) => {
-        setProduct(json?.data ?? json);
-        setLoading(false);
-      })
-      .catch(() => {
-        setError(true);
-        setLoading(false);
-      });
-  }, [slug]);
+    fetchProduct(slug, searchParams.get("vault_token") || "");
+  }, [slug, fetchProduct]);
 
   // ── Auto-cycle images (3s interval, pauses on hover) ─────────────────────
   useEffect(() => {
@@ -326,7 +359,7 @@ const handleBuyNow = () => {
     );
   }
 
-  if (error || !product) {
+  if (error || (!product && !locked)) {
     return (
       <div
         style={{
@@ -359,6 +392,82 @@ const handleBuyNow = () => {
           }}>
           ← Back to Shop
         </Link>
+      </div>
+    );
+  }
+
+  if (locked) {
+    return (
+      <div
+        style={{
+          minHeight: "70vh",
+          background: "#000",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexDirection: "column",
+          gap: 18,
+          padding: "120px 20px 60px",
+          fontFamily: "'Space Mono', monospace",
+        }}>
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="rgba(239,68,68,0.7)" strokeWidth="1.5">
+          <rect x="5" y="11" width="14" height="9" rx="1.5" />
+          <path d="M8 11V7a4 4 0 018 0v4" />
+        </svg>
+        <p
+          style={{
+            fontFamily: "'Bebas Neue', sans-serif",
+            fontSize: "2.4rem",
+            color: "rgba(255,255,255,0.8)",
+            letterSpacing: "0.08em",
+            margin: 0,
+            textAlign: "center",
+          }}>
+          VAULT ITEM
+        </p>
+        <p style={{color: "rgba(239,68,68,0.75)", fontSize: 11, letterSpacing: "0.3em", margin: 0}}>
+          ACCESS REQUIRED
+        </p>
+        <button
+          onClick={() => setShowVaultUnlock(true)}
+          style={{
+            marginTop: 14,
+            background: "transparent",
+            border: "1px solid #ef4444",
+            color: "#ef4444",
+            fontFamily: "'Space Mono', monospace",
+            fontSize: 12,
+            fontWeight: 700,
+            letterSpacing: "0.2em",
+            padding: "12px 28px",
+            cursor: "pointer",
+            borderRadius: 4,
+          }}>
+          [ ENTER CODE ]
+        </button>
+        <Link
+          to="/shop"
+          style={{
+            color: "rgba(255,255,255,0.3)",
+            fontSize: 11,
+            letterSpacing: "0.15em",
+            textTransform: "uppercase",
+            textDecoration: "none",
+            marginTop: 8,
+          }}>
+          ← Back to Shop
+        </Link>
+        {showVaultUnlock && (
+          <VaultUnlockModal
+            productId={lockedId}
+            onClose={() => setShowVaultUnlock(false)}
+            onUnlocked={({unlockToken}) => {
+              setShowVaultUnlock(false);
+              setLoading(true);
+              fetchProduct(slug, unlockToken);
+            }}
+          />
+        )}
       </div>
     );
   }
@@ -801,7 +910,7 @@ const handleBuyNow = () => {
                       viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                     </svg>
-                    Added to Cart!
+                    Acquired!
                   </>
                 ) : isInCart ? (
                   <>
@@ -831,7 +940,7 @@ const handleBuyNow = () => {
                         d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
                       />
                     </svg>
-                    Add to Cart
+                    Acquire Item
                   </>
                 )}
               </button>

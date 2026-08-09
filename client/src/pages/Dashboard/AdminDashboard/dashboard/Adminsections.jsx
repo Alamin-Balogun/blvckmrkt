@@ -886,6 +886,30 @@ function ProductModal({mode, data, onChange, onSave, onClose, saving, brands, ca
               </select>
             </div>
           </div>
+          <div style={{display: "grid", gridTemplateColumns: data.is_vault ? "1fr 1fr" : "1fr", gap: 10}}>
+            <div>
+              <label style={lbl}>🔒 Vault Item</label>
+              <select
+                value={data.is_vault ? "true" : "false"}
+                onChange={(e) => onChange("is_vault", e.target.value === "true")}
+                style={sel}>
+                <option value="false">No</option>
+                <option value="true">Yes — classified, code-gated</option>
+              </select>
+            </div>
+            {data.is_vault && (
+              <div>
+                <label style={lbl}>Access Code</label>
+                <input
+                  type="text"
+                  value={data.vault_code || ""}
+                  onChange={(e) => onChange("vault_code", e.target.value)}
+                  placeholder={mode === "create" ? "Required" : "Leave blank to keep current code"}
+                  style={inp}
+                />
+              </div>
+            )}
+          </div>
           {/* Product Images Upload */}
           <div>
             <label style={lbl}>Product Images</label>
@@ -975,6 +999,8 @@ export function AdminProducts() {
   const [brands, setBrands] = useState([]);
   const [categories, setCategories] = useState([]);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [page, setPage] = useState(1);
+  const PRODUCTS_PER_PAGE = 25;
 
   useEffect(() => {
     getBrands({limit: 200})
@@ -986,9 +1012,13 @@ export function AdminProducts() {
   }, []);
 
   useEffect(() => {
+    setPage(1);
+  }, [search, statusFilter]);
+
+  useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    const params = {limit: 25};
+    const params = {limit: PRODUCTS_PER_PAGE, page};
     if (search.trim()) params.search = search.trim();
     if (statusFilter) params.status = statusFilter;
     getProducts(params)
@@ -1007,7 +1037,7 @@ export function AdminProducts() {
     return () => {
       cancelled = true;
     };
-  }, [search, statusFilter, refreshKey]);
+  }, [search, statusFilter, page, refreshKey]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -1288,7 +1318,7 @@ export function AdminProducts() {
       <SearchBar
         value={search}
         onChange={setSearch}
-        placeholder="Search by product name..."
+        placeholder="Search by product or brand name..."
         actions={
           <button
             onClick={() => setModal({mode: "create", data: {status: "draft", is_featured: false}})}
@@ -1338,10 +1368,51 @@ export function AdminProducts() {
           onRowClick={(p) => setSelectedId(p.id)}
           emptyMsg="No products found."
         />
+
+        {total > PRODUCTS_PER_PAGE && (
+          <div
+            style={{
+              padding: "12px 20px",
+              borderTop: "1px solid rgba(255,255,255,0.05)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}>
+            <span style={{color: "rgba(255,255,255,0.25)", fontSize: 11}}>
+              Page {page} · {products.length} of {total}
+            </span>
+            <div style={{display: "flex", gap: 8}}>
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+                style={productsPageBtn(page === 1)}>
+                ← Prev
+              </button>
+              <button
+                onClick={() => setPage((p) => p + 1)}
+                disabled={products.length < PRODUCTS_PER_PAGE}
+                style={productsPageBtn(products.length < PRODUCTS_PER_PAGE)}>
+                Next →
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 }
+
+const productsPageBtn = (disabled) => ({
+  padding: "6px 14px",
+  borderRadius: 8,
+  background: "rgba(255,255,255,0.04)",
+  border: "1px solid rgba(255,255,255,0.1)",
+  color: disabled ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.5)",
+  fontSize: 11,
+  fontWeight: 700,
+  cursor: disabled ? "not-allowed" : "pointer",
+  opacity: disabled ? 0.5 : 1,
+});
 
 // ── DROPS ─────────────────────────────────────────────────────────────────────
 const DROP_STATUS_COLOR = {

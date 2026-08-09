@@ -9,6 +9,7 @@ import (
 	"github.com/Alamin-Balogun/blvckmrkt/models"
 	"github.com/Alamin-Balogun/blvckmrkt/utils"
 	"github.com/gin-gonic/gin"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // ── GET /api/admin/products ───────────────────────────────────────────────────
@@ -21,7 +22,10 @@ func AdminListProducts(c *gin.Context) {
 	q := database.DB.Model(&models.Product{}).Preload("Images").Preload("Sizes")
 
 	if search != "" {
-		q = q.Where("name LIKE ?", "%"+search+"%")
+		q = q.Where(
+			"name LIKE ? OR brand_id IN (SELECT id FROM brands WHERE brand_name LIKE ?)",
+			"%"+search+"%", "%"+search+"%",
+		)
 	}
 	if status != "" {
 		q = q.Where("status = ?", status)
@@ -132,6 +136,8 @@ func AdminCreateProduct(c *gin.Context) {
 		CategoryID   *uint   `json:"category_id"`
 		Tags         string  `json:"tags"`
 		IsFeatured   bool    `json:"is_featured"`
+		IsVault      bool    `json:"is_vault"`
+		VaultCode    string  `json:"vault_code"`
 		Images       []struct {
 			URL      string `json:"url"`
 			Position int    `json:"position"`
@@ -140,6 +146,19 @@ func AdminCreateProduct(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		utils.BadRequest(c, "brand_id, name and price are required", nil)
 		return
+	}
+	if req.IsVault && req.VaultCode == "" {
+		utils.BadRequest(c, "A Vault item needs an access code", nil)
+		return
+	}
+	vaultCodeHash := ""
+	if req.VaultCode != "" {
+		hashed, err := bcrypt.GenerateFromPassword([]byte(req.VaultCode), bcrypt.DefaultCost)
+		if err != nil {
+			utils.InternalError(c, "Failed to set Vault access code")
+			return
+		}
+		vaultCodeHash = string(hashed)
 	}
 
 	var brand models.Brand
@@ -173,10 +192,12 @@ func AdminCreateProduct(c *gin.Context) {
 		Price:        req.Price,
 		ComparePrice: req.ComparePrice,
 		Weight:       weight,
-		CategoryID:   req.CategoryID,
-		Tags:         req.Tags,
-		IsFeatured:   req.IsFeatured,
-		Status:       models.ProductDraft,
+		CategoryID:    req.CategoryID,
+		Tags:          req.Tags,
+		IsFeatured:    req.IsFeatured,
+		IsVault:       req.IsVault,
+		VaultCodeHash: vaultCodeHash,
+		Status:        models.ProductDraft,
 	}
 
 	if err := database.DB.Create(&product).Error; err != nil {
@@ -218,6 +239,8 @@ func AdminUpdateProduct(c *gin.Context) {
 		IsFeatured   *bool   `json:"is_featured"`
 		Tags         string  `json:"tags"`
 		CategoryID   *uint   `json:"category_id"`
+		IsVault      *bool   `json:"is_vault"`
+		VaultCode    string  `json:"vault_code"`
 		Images       []struct {
 			URL      string `json:"url"`
 			Position int    `json:"position"`
@@ -238,6 +261,15 @@ func AdminUpdateProduct(c *gin.Context) {
 	if req.IsFeatured != nil  { updates["is_featured"]   = *req.IsFeatured }
 	if req.Tags != ""         { updates["tags"]          = req.Tags }
 	if req.CategoryID != nil  { updates["category_id"]   = req.CategoryID }
+	if req.IsVault != nil     { updates["is_vault"]      = *req.IsVault }
+	if req.VaultCode != "" {
+		hashed, err := bcrypt.GenerateFromPassword([]byte(req.VaultCode), bcrypt.DefaultCost)
+		if err != nil {
+			utils.InternalError(c, "Failed to set Vault access code")
+			return
+		}
+		updates["vault_code_hash"] = string(hashed)
+	}
 
 	if len(updates) > 0 {
 		database.DB.Model(&models.Product{}).Where("id = ?", id).Updates(updates)

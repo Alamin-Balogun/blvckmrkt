@@ -8,6 +8,7 @@ import {
   setDellymanPickupAddress,
 } from "./dashboard_components/api";
 import PhoneInput from "../../../../components/phoneinput";
+import {TypeaheadField, useLocationOptions} from "../../../../components/LocationTypeahead";
 
 const BLANK = {
   label: "",
@@ -64,6 +65,7 @@ export default function BrandAddresses() {
   const [error, setError] = useState("");
   const [deleting, setDeleting] = useState(null);
   const [phoneValid, setPhoneValid] = useState(true);
+  const {countryOptions, stateOptions, cityOptions} = useLocationOptions(form.country, form.state);
 
   useEffect(() => {
     getAddresses()
@@ -259,29 +261,37 @@ export default function BrandAddresses() {
             onBlur={onB}
           />
         </div>
+        <div>
+          <Label>Country</Label>
+          <TypeaheadField
+            options={countryOptions}
+            text={form.country}
+            onTextChange={(text) => setForm((f) => ({...f, country: text}))}
+            onSelect={(opt) => setForm((f) => ({...f, country: opt.label, state: "", city: ""}))}
+            placeholder="Type or select a country…"
+          />
+        </div>
         <div
           style={{display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10}}
           className="addr-form-row">
           <div>
-            <Label>City</Label>
-            <input
-              placeholder="Lagos"
-              value={form.city}
-              onChange={(e) => setForm({...form, city: e.target.value})}
-              style={inp}
-              onFocus={onF}
-              onBlur={onB}
+            <Label>State / Region</Label>
+            <TypeaheadField
+              options={stateOptions}
+              text={form.state}
+              onTextChange={(text) => setForm((f) => ({...f, state: text}))}
+              onSelect={(opt) => setForm((f) => ({...f, state: opt.label, city: ""}))}
+              placeholder="Type or select a state…"
             />
           </div>
           <div>
-            <Label>State / Region</Label>
-            <input
-              placeholder="Lagos State"
-              value={form.state}
-              onChange={(e) => setForm({...form, state: e.target.value})}
-              style={inp}
-              onFocus={onF}
-              onBlur={onB}
+            <Label>City</Label>
+            <TypeaheadField
+              options={cityOptions}
+              text={form.city}
+              onTextChange={(text) => setForm((f) => ({...f, city: text}))}
+              onSelect={(opt) => setForm((f) => ({...f, city: opt.label}))}
+              placeholder="Type or select a city…"
             />
           </div>
         </div>
@@ -294,17 +304,6 @@ export default function BrandAddresses() {
               placeholder="100001"
               value={form.postcode}
               onChange={(e) => setForm({...form, postcode: e.target.value})}
-              style={inp}
-              onFocus={onF}
-              onBlur={onB}
-            />
-          </div>
-          <div>
-            <Label>Country</Label>
-            <input
-              placeholder="Nigeria"
-              value={form.country}
-              onChange={(e) => setForm({...form, country: e.target.value})}
               style={inp}
               onFocus={onF}
               onBlur={onB}

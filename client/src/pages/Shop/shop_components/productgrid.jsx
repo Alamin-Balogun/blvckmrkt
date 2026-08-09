@@ -198,6 +198,21 @@ export default function ProductGrid() {
     fetchProducts();
   }, [fetchProducts]);
 
+  // ── Scroll to + pulse-highlight a specific product (from header search) ────
+  const highlightedRef = useRef(null);
+  useEffect(() => {
+    const highlightId = searchParams.get("highlight");
+    if (!highlightId || loading || products.length === 0) return;
+    if (highlightedRef.current === highlightId) return;
+    const el = document.getElementById(`product-${highlightId}`);
+    if (!el) return;
+    highlightedRef.current = highlightId;
+    el.scrollIntoView({behavior: "smooth", block: "center"});
+    el.classList.add("pg-highlight");
+    const t = setTimeout(() => el.classList.remove("pg-highlight"), 3000);
+    return () => clearTimeout(t);
+  }, [products, loading, searchParams]);
+
   // ── Handlers ──────────────────────────────────────────────────────────────
   const toggleBrand = (id) => {
     setSelectedBrandIds((prev) => {
@@ -375,6 +390,11 @@ export default function ProductGrid() {
       <div
         style={{maxWidth: 1280, margin: "0 auto", padding: "100px 48px 48px", overflow: "visible"}}>
         <style>{`
+        .pg-highlight { animation: pgHighlightPulse 1.4s ease-out 2; border-radius: 10px; }
+        @keyframes pgHighlightPulse {
+          0%   { box-shadow: 0 0 0 0 rgba(239,68,68,0.65); }
+          100% { box-shadow: 0 0 0 16px rgba(239,68,68,0); }
+        }
         .pg-wrap    { display: flex; gap: 36px; align-items: flex-start; overflow: visible; }
         .pg-sidebar { width: 240px; flex-shrink: 0; display: flex; flex-direction: column; }
         .pg-grid    { flex: 1; min-width: 0; }
@@ -829,6 +849,7 @@ export default function ProductGrid() {
                   products.map((p, i) => (
                     <motion.div
                       key={p.id}
+                      id={`product-${p.id}`}
                       initial={{opacity: 0, y: 20}}
                       animate={{opacity: 1, y: 0}}
                       transition={{duration: 0.35, delay: i * 0.05}}>

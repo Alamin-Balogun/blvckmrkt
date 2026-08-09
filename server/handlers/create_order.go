@@ -55,6 +55,9 @@ type createOrderItem struct {
 	Quantity   int     `json:"quantity"    binding:"required,min=1"`
 	Size       string  `json:"size"`
 	UnitPrice  float64 `json:"unit_price"  binding:"required"`
+	// VaultToken proves this line item's product (if it's a Vault item) was
+	// actually unlocked — see handlers/vault.go. Ignored for non-Vault items.
+	VaultToken string `json:"vault_token"`
 }
 
 type createOrderRequest struct {
@@ -582,6 +585,13 @@ func buildOrder(
 			var product models.Product
 			if err := tx.First(&product, it.ProductID).Error; err != nil {
 				return fmt.Errorf("product %d not found", it.ProductID)
+			}
+
+			// Vault items can't be checked out without proof they were
+			// actually unlocked first — closes the gap where the UI hid the
+			// details but checkout was hit directly with a guessed price.
+			if product.IsVault && !vaultTokenValid(product.ID, it.VaultToken) {
+				return fmt.Errorf("%s is a Vault item and needs to be unlocked before it can be purchased", product.Name)
 			}
 
 			unitPrice := product.Price

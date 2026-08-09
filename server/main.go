@@ -138,6 +138,7 @@ func main() {
 	// 4. Background jobs
 	go handlers.StartDropExpiryJob()
 	go database.CleanupBlacklistedTokens() // ✅ ADD THIS - Cleanup expired tokens
+	go handlers.WarmDellymanLocationsCache()
 
 	// 5. GIN SETUP
 	if config.App.Env == "production" {

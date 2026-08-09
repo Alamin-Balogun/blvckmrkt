@@ -3,6 +3,7 @@ import {useCartWishlist} from "./cartcontext";
 import {Link, useLocation, useNavigate} from "react-router-dom";
 import {motion, AnimatePresence} from "framer-motion";
 import logo from "../assets/logo.png";
+import HeaderSearch from "./headersearch";
 
 // ── CMS defaults — shown before/if API doesn't return values ─────────────────
 const DEFAULT_MARQUEE_ITEMS = [
@@ -228,20 +229,22 @@ export default function Navbar() {
             <div className="flex items-center">
               <AnimatePresence>
                 {searchOpen && (
-                  <motion.input
+                  <motion.div
                     initial={{width: 0, opacity: 0}}
-                    animate={{width: 160, opacity: 1}}
+                    animate={{width: 200, opacity: 1}}
                     exit={{width: 0, opacity: 0}}
                     transition={{duration: 0.2}}
-                    autoFocus
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && submitSearch()}
-                    onBlur={() => !searchQuery && setSearchOpen(false)}
-                    placeholder="Search products..."
-                    className="bg-transparent border-b border-white/20 text-white text-xs px-1 py-1 outline-none placeholder:text-white/30 mr-2"
-                  />
+                    className="mr-2 overflow-visible">
+                    <HeaderSearch
+                      value={searchQuery}
+                      onChange={setSearchQuery}
+                      autoFocus
+                      onNavigate={() => setSearchOpen(false)}
+                      onBlur={() => !searchQuery && setSearchOpen(false)}
+                      placeholder="Search products or brands..."
+                      inputClassName="bg-transparent border-b border-white/20 text-white text-xs px-1 py-1 outline-none placeholder:text-white/30 w-full"
+                    />
+                  </motion.div>
                 )}
               </AnimatePresence>
               <button
@@ -418,18 +421,12 @@ export default function Navbar() {
                       d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                     />
                   </svg>
-                  <input
-                    type="text"
+                  <HeaderSearch
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        submitSearch();
-                        setMenuOpen(false);
-                      }
-                    }}
-                    placeholder="Search products..."
-                    className="flex-1 bg-transparent text-white text-sm outline-none placeholder:text-white/30"
+                    onChange={setSearchQuery}
+                    onNavigate={() => setMenuOpen(false)}
+                    placeholder="Search products or brands..."
+                    inputClassName="flex-1 bg-transparent text-white text-sm outline-none placeholder:text-white/30 w-full"
                   />
                 </div>
                 <div className="flex flex-col items-center gap-3 mb-8">

@@ -564,7 +564,7 @@ export default function DropsGrid() {
                           <div className="drop-icons">
                             {/* Cart button */}
                             <button
-                              title={isInCart ? "Remove from cart" : "Add to cart"}
+                              title={isInCart ? "Remove from cart" : "Acquire item"}
                               className={`drop-icon-btn drop-cart-btn ${isAdded ? "added" : isInCart ? "in-cart" : ""}`}
                               disabled={loadingCartId === item.id}
                               onClick={(e) => addToCart(item, e)}>

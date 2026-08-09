@@ -94,7 +94,7 @@ export default function ProductCard({
         )}
         <div className="pg-icons">
           <button
-            title={outOfStock ? "Sold out" : inCart ? "Remove from cart" : "Add to cart"}
+            title={outOfStock ? "Sold out" : inCart ? "Remove from cart" : "Acquire item"}
             className={`pg-icon-btn ${justAdded ? "cart-added" : inCart ? "cart" : ""}`}
             disabled={cartLoading || outOfStock}
             style={outOfStock ? {opacity: 0.35, cursor: "not-allowed"} : undefined}

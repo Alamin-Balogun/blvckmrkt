@@ -1,11 +1,12 @@
 import {useState, useEffect, useRef, useMemo, useCallback} from "react";
-import {createPortal} from "react-dom";
 import {motion, AnimatePresence} from "framer-motion";
 import {Link, useNavigate, useLocation} from "react-router-dom";
 import {useCartWishlist, getToken} from "../../../components/cartcontext";
 import {useCurrency} from "../../../components/currencycontext";
 import { useGeo } from "../../../utils/geo";
 import PhoneInput from "../../../components/phoneinput";
+import {TypeaheadField} from "../../../components/LocationTypeahead";
+import {useDellymanLocations, findDellymanCities, mergeCityNames} from "../../../utils/dellymanLocations";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "https://blvckmrktng.com";
 
@@ -78,189 +79,6 @@ function CopyRow({label, value, highlight}) {
         </svg>
       </button>
     </div>
-  );
-}
-
-// ─── Portal dropdown ──────────────────────────────────────────────────────────
-// A real typeable text field — not a click-to-open picker. Typing filters a
-// live dropdown of every option (shown in full on focus, narrowed as you
-// type), but the field never forces a match: whatever text is in the box is
-// the value, so someone who can't find their country/state/city on the list
-// can just type it in by hand. Selecting a suggestion snaps the text to its
-// canonical label and reports the option back via onSelect so the parent can
-// resolve an ISO code (used only to drive the next field's suggestions).
-function TypeaheadField({options, text, onTextChange, onSelect, placeholder, disabled, hasError}) {
-  const [open, setOpen] = useState(false);
-  const inputRef = useRef(null);
-  const dropdownRef = useRef(null);
-  const [coords, setCoords] = useState({top: 0, left: 0, width: 0});
-
-  const filtered = useMemo(() => {
-    const q = (text || "").trim().toLowerCase();
-    if (!q) return options.slice(0, 250);
-    return options.filter((o) => o.label.toLowerCase().includes(q)).slice(0, 250);
-  }, [options, text]);
-
-  const syncCoords = useCallback(() => {
-    if (!inputRef.current) return;
-    const r = inputRef.current.getBoundingClientRect();
-    if (r.bottom < 0 || r.top > window.innerHeight) {
-      setOpen(false);
-      return;
-    }
-    setCoords({top: r.bottom + 6, left: r.left, width: r.width});
-  }, []);
-
-  const openDropdown = useCallback(() => {
-    if (disabled || options.length === 0) return;
-    syncCoords();
-    setOpen(true);
-  }, [disabled, options.length, syncCoords]);
-
-  useEffect(() => {
-    if (!open) return;
-    window.addEventListener("scroll", syncCoords, {passive: true, capture: true});
-    window.addEventListener("resize", syncCoords, {passive: true});
-    return () => {
-      window.removeEventListener("scroll", syncCoords, {capture: true});
-      window.removeEventListener("resize", syncCoords);
-    };
-  }, [open, syncCoords]);
-
-  const pick = (opt) => {
-    onSelect(opt);
-    setOpen(false);
-  };
-
-  return (
-    <>
-      <div style={{position: "relative"}}>
-        <input
-          ref={inputRef}
-          type="text"
-          value={text || ""}
-          disabled={disabled}
-          placeholder={placeholder}
-          autoComplete="off"
-          onChange={(e) => {
-            onTextChange(e.target.value);
-            if (options.length > 0) openDropdown();
-          }}
-          onFocus={() => openDropdown()}
-          onBlur={() => setOpen(false)}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") setOpen(false);
-          }}
-          style={{
-            background: disabled ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.04)",
-            border: `1px solid ${hasError ? "#ef4444" : open ? "rgba(239,68,68,0.55)" : "rgba(255,255,255,0.1)"}`,
-            color: "#fff",
-            fontSize: 13,
-            padding: options.length > 0 ? "12px 34px 12px 14px" : "12px 14px",
-            outline: "none",
-            width: "100%",
-            boxSizing: "border-box",
-            borderRadius: 8,
-            transition: "border-color 0.2s",
-            fontFamily: "inherit",
-            boxShadow: open ? "0 0 0 3px rgba(239,68,68,0.1)" : "none",
-            cursor: disabled ? "not-allowed" : "text",
-          }}
-        />
-        {options.length > 0 && (
-          <svg
-            style={{
-              position: "absolute",
-              right: 12,
-              top: "50%",
-              transform: open ? "translateY(-50%) rotate(180deg)" : "translateY(-50%)",
-              transition: "transform 0.18s",
-              pointerEvents: "none",
-            }}
-            width="11"
-            height="11"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke={disabled ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.3)"}
-            strokeWidth="2.5">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-          </svg>
-        )}
-      </div>
-
-      {open &&
-        options.length > 0 &&
-        createPortal(
-          <div
-            ref={dropdownRef}
-            style={{
-              position: "fixed",
-              top: coords.top,
-              left: coords.left,
-              width: coords.width,
-              background: "#181818",
-              border: "1px solid rgba(255,255,255,0.14)",
-              borderRadius: 12,
-              zIndex: 99999,
-              boxShadow: "0 24px 64px rgba(0,0,0,0.85), 0 0 0 1px rgba(239,68,68,0.08)",
-              overflow: "hidden",
-            }}>
-            <div style={{maxHeight: 260, overflowY: "auto"}}>
-              {filtered.length === 0 ? (
-                <div style={{padding: "18px", color: "rgba(255,255,255,0.25)", fontSize: 12, textAlign: "center"}}>
-                  No matches — the text you typed will be used as-is
-                </div>
-              ) : (
-                filtered.map((opt) => {
-                  const isSelected = opt.label.toLowerCase() === (text || "").trim().toLowerCase();
-                  return (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      // onMouseDown (not onClick) fires before the input's onBlur,
-                      // so the pick registers before the dropdown closes.
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        pick(opt);
-                      }}
-                      style={{
-                        width: "100%",
-                        textAlign: "left",
-                        border: "none",
-                        padding: "9px 14px",
-                        cursor: "pointer",
-                        fontSize: 13,
-                        background: isSelected ? "rgba(239,68,68,0.1)" : "transparent",
-                        color: isSelected ? "#ef4444" : "rgba(255,255,255,0.72)",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 9,
-                        transition: "background 0.1s",
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!isSelected) e.currentTarget.style.background = "rgba(255,255,255,0.06)";
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!isSelected) e.currentTarget.style.background = "transparent";
-                      }}>
-                      {opt.flag && (
-                        <span style={{fontSize: 15, lineHeight: 1, flexShrink: 0}}>{opt.flag}</span>
-                      )}
-                      <span style={{flex: 1}}>{opt.label}</span>
-                      {isSelected && (
-                        <svg width="11" height="11" fill="none" stroke="#ef4444" strokeWidth="3" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                      )}
-                    </button>
-                  );
-                })
-              )}
-            </div>
-          </div>,
-          document.body,
-        )}
-    </>
   );
 }
 
@@ -650,6 +468,7 @@ export default function CheckoutForm() {
   const {cartItems, refreshCart, clearCart} = useCartWishlist();
   const {fmtMoney, convert, userCurrency, baseCurrency} = useCurrency();
   const { Country, State, City, loaded: geoLoaded } = useGeo();
+  const {states: dellymanStates} = useDellymanLocations();
 
   // ── Source detection ──────────────────────────────────────────────────────
   const stateData = location.state || {};
@@ -967,19 +786,22 @@ const countryOptions = useMemo(() => {
 
 const stateOptions = useMemo(() => {
     if (!geoLoaded || !delivery.country_code) return [];
-    return State.getStatesOfCountry(delivery.country_code).map((s) => ({
+    const all = State.getStatesOfCountry(delivery.country_code).map((s) => ({
       value: s.isoCode,
       label: s.name,
     }));
+    return all;
   }, [geoLoaded, State, delivery.country_code]);
 
 const cityOptions = useMemo(() => {
-    if (!geoLoaded || !delivery.country_code || !delivery.state_code) return [];
-    return City.getCitiesOfState(delivery.country_code, delivery.state_code).map((c) => ({
-      value: c.name,
-      label: c.name,
-    }));
-  }, [geoLoaded, City, delivery.country_code, delivery.state_code]);
+    const libraryCities =
+      geoLoaded && delivery.country_code && delivery.state_code
+        ? City.getCitiesOfState(delivery.country_code, delivery.state_code).map((c) => c.name)
+        : [];
+    const dmCities =
+      delivery.country_code === "NG" ? findDellymanCities(dellymanStates, delivery.state_name) : [];
+    return mergeCityNames(libraryCities, dmCities);
+  }, [geoLoaded, City, delivery.country_code, delivery.state_code, dellymanStates, delivery.state_name]);
 
   // ── Load items ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -1143,6 +965,9 @@ const cityOptions = useMemo(() => {
       quantity: i.qty,
       size: i.size,
       unit_price: i.price,
+      // Vault items need proof they were actually unlocked — see
+      // vaultunlockmodal.jsx, which stores this under the same key.
+      vault_token: localStorage.getItem(`vault_token_${i.productId}`) || "",
     })),
     contact: {
       email: contact.email,
@@ -1386,6 +1211,7 @@ if (receipt) {
             quantity: i.qty,
             size: i.size,
             unit_price: i.price,
+            vault_token: localStorage.getItem(`vault_token_${i.productId}`) || "",
           })),
           contact: {
             email: contact.email,

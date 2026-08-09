@@ -24,6 +24,7 @@ func Register(r *gin.Engine) {
 	// ── Checkout delivery pricing (public — guest checkout needs it too) ───────
 	api.GET("/checkout/delivery-mode", handlers.CheckoutDeliveryMode)
 	api.POST("/checkout/dellyman-quote", middleware.RateLimit(60, time.Minute), handlers.CheckoutDellymanQuote)
+	api.GET("/dellyman/locations", middleware.RateLimit(30, time.Minute), handlers.DellymanLocations)
 
 	// ── Site visit tracking (public, fire-and-forget beacon) ───────────────────
 	api.POST("/track/visit", middleware.RateLimit(120, time.Minute), handlers.TrackVisit)
@@ -88,6 +89,7 @@ func Register(r *gin.Engine) {
 		shop.GET("/brands/:brandId/shipping", handlers.GetShopShipping)
 		shop.GET("/categories", handlers.ListCategories)
 		shop.GET("/counts", handlers.GetShopCounts)
+		shop.POST("/vault/unlock", handlers.VaultUnlock)
 	}
 
 	// ── Site Pages (public CMS) ────────────────────────────────────────────────

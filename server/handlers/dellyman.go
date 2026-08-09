@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Alamin-Balogun/blvckmrkt/config"
@@ -108,7 +109,7 @@ func dellymanPickupAddress(tx *gorm.DB, brandID uint) (models.Brand, models.Addr
 		if name == "" {
 			name = fmt.Sprintf("Brand #%d", brandID)
 		}
-		return brand, models.Address{}, fmt.Errorf("%s hasn't set up a Dellyman pickup address yet, so courier delivery isn't available for their items right now — please remove those items or try again once the brand has added one in their dashboard's Addresses page", name)
+		return brand, models.Address{}, fmt.Errorf("%s hasn't set up a courier pickup address yet, so delivery isn't available for their items right now — please remove those items or try again once the brand has added one in their dashboard's Addresses page", name)
 	}
 
 	return brand, addr, nil
@@ -147,7 +148,7 @@ func quoteDellymanForBrands(tx *gorm.DB, brandTotals map[uint]float64, brandOrde
 			return nil, 0, fmt.Errorf("delivery pricing is temporarily unavailable, please try again shortly")
 		}
 		if len(resp.Companies) == 0 {
-			return nil, 0, fmt.Errorf("no courier is currently available for this delivery address")
+			return nil, 0, fmt.Errorf("our courier can't deliver to this address yet — please try a location closer to a major city, or choose self-pickup if the brand offers it")
 		}
 
 		cheapest := resp.Companies[0]
@@ -643,4 +644,95 @@ func syncOrderStatusFromDellyman(orderID uint) {
 	} else if anyInTransit && (order.Status == models.OrderPending || order.Status == models.OrderProcessing) {
 		database.DB.Model(&order).Update("status", models.OrderShipped)
 	}
+}
+
+// ── Locations (states/cities Dellyman's own network recognizes) ────────────
+//
+// Their "GetQuotes"/"BookOrder" flow expects a free-text address, but the
+// country-state-city npm package used everywhere on the frontend for
+// suggestions doesn't have Dellyman's own area names (e.g. Lagos "Ketu",
+// "Agric" — real Dellyman city entries missing from that generic dataset).
+// Discovered these two undocumented endpoints by probing the API; they
+// return Dellyman's actual State/City reference list, which the frontend
+// merges into its typeahead suggestions so users can pick names that match
+// what Dellyman expects, cutting down address mismatches at quote time.
+//
+// This is near-static reference data, so it's cached in memory rather than
+// re-fetched (37 states x 1 cities call each) on every request.
+var (
+	dellymanLocationsCache   map[string][]string
+	dellymanLocationsCacheAt time.Time
+	dellymanLocationsMu      sync.Mutex
+)
+
+const dellymanLocationsCacheTTL = 24 * time.Hour
+
+func fetchDellymanLocations() (map[string][]string, error) {
+	states, err := services.GetStates()
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[string][]string, len(states))
+	for _, s := range states {
+		cities, err := services.GetCities(s.StateID)
+		if err != nil {
+			log.Printf("⚠️ Dellyman: failed to fetch cities for state %s (%s): %v", s.Name, s.StateID, err)
+			continue
+		}
+		names := make([]string, len(cities))
+		for i, city := range cities {
+			names[i] = city.Name
+		}
+		result[s.Name] = names
+	}
+	return result, nil
+}
+
+// WarmDellymanLocationsCache pre-fetches the states/cities cache in the
+// background at server startup, so the first real request doesn't have to
+// wait on ~38 sequential live Dellyman calls.
+func WarmDellymanLocationsCache() {
+	result, err := fetchDellymanLocations()
+	if err != nil {
+		log.Printf("⚠️ Dellyman: failed to warm locations cache at startup: %v", err)
+		return
+	}
+	dellymanLocationsMu.Lock()
+	dellymanLocationsCache = result
+	dellymanLocationsCacheAt = time.Now()
+	dellymanLocationsMu.Unlock()
+	log.Printf("[boot] Dellyman locations cache warmed — %d states", len(result))
+}
+
+// DellymanLocations is GET /api/dellyman/locations — public. Returns every
+// state → [city names] Dellyman's own network recognizes.
+func DellymanLocations(c *gin.Context) {
+	dellymanLocationsMu.Lock()
+	cached := dellymanLocationsCache
+	fresh := cached != nil && time.Since(dellymanLocationsCacheAt) < dellymanLocationsCacheTTL
+	dellymanLocationsMu.Unlock()
+
+	if fresh {
+		utils.OK(c, "Dellyman locations fetched", gin.H{"states": cached})
+		return
+	}
+
+	result, err := fetchDellymanLocations()
+	if err != nil {
+		if cached != nil {
+			// Serve stale data rather than nothing if Dellyman's API is down.
+			utils.OK(c, "Dellyman locations fetched (cached)", gin.H{"states": cached})
+			return
+		}
+		utils.InternalError(c, "Failed to fetch courier locations")
+		return
+	}
+
+	dellymanLocationsMu.Lock()
+	dellymanLocationsCache = result
+	dellymanLocationsCacheAt = time.Now()
+	dellymanLocationsMu.Unlock()
+
+	utils.OK(c, "Dellyman locations fetched", gin.H{"states": result})
 }

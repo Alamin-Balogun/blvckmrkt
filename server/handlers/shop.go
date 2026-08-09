@@ -32,6 +32,7 @@ type ProductSummary struct {
 	PrimaryImage string               `json:"primary_image"`
 	Sizes        []models.ProductSize `json:"sizes,omitempty"`
 	CreatedAt    interface{}          `json:"created_at,omitempty"`
+	IsVault      bool                 `json:"is_vault,omitempty"`
 }
 
 // ── fetchProductSummaries ─────────────────────────────────────────────────────
@@ -113,6 +114,15 @@ func ListProducts(c *gin.Context) {
 	if excludeBrandID := c.Query("exclude_brand_id"); excludeBrandID != "" {
 		query = query.Where("products.brand_id != ?", excludeBrandID)
 	}
+	// Vault items never show up in normal browsing/search — only the
+	// dedicated Vault section (which explicitly asks for is_vault=true) sees
+	// them, and even then always masked below regardless of any token, since
+	// the homepage teaser is meant to always read as locked/classified.
+	if c.Query("is_vault") == "true" {
+		query = query.Where("products.is_vault = ?", true)
+	} else {
+		query = query.Where("products.is_vault = ?", false)
+	}
 	if minPrice := c.Query("min_price"); minPrice != "" {
 		query = query.Where("products.price >= ?", minPrice)
 	}
@@ -158,6 +168,13 @@ func ListProducts(c *gin.Context) {
 
 	resp := make([]ProductSummary, len(products))
 	for i, p := range products {
+		if p.IsVault {
+			// Always masked here regardless of unlock status — see comment
+			// above the is_vault filter. Full detail is only ever available
+			// via GetProduct with a valid vault_token.
+			resp[i] = ProductSummary{ID: p.ID, IsVault: true}
+			continue
+		}
 		primaryImg := ""
 		for _, img := range p.Images {
 			if img.Position == 0 {
@@ -222,6 +239,19 @@ func GetProduct(c *gin.Context) {
 
 	if brand.ID == 0 || brand.DeletedAt.Valid || brand.VerificationStatus != models.VerificationVerified {
 		utils.NotFound(c, "Product not found")
+		return
+	}
+
+	// ── Vault gate ───────────────────────────────────────────────────────
+	// Real enforcement, not just a UI hint — even a direct hit on this
+	// endpoint (URL guessing) gets the locked stub unless a valid
+	// vault_token for this exact product is supplied.
+	if product.IsVault && !vaultTokenValid(product.ID, c.Query("vault_token")) {
+		utils.OK(c, "Vault item locked", gin.H{
+			"id":       product.ID,
+			"is_vault": true,
+			"locked":   true,
+		})
 		return
 	}
 

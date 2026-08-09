@@ -11,6 +11,7 @@ import DashboardFAB from "./components/DashboardFAB";
 import VisitTracker from "./components/visittracker";
 import ScrollToTop from "./components/scrolltotop";
 import SignupPrompt from "./components/signupprompt";
+import MarketGate from "./components/marketgate";
 
 function DashboardGuard({ children, required, redirect }) {
   const { user, loading } = useAuth();
@@ -102,6 +103,7 @@ createRoot(document.getElementById("root")).render(
           <CartWishlistProvider>
             {/* ✅ Suspense wraps ALL routes — shows PageLoader while chunk downloads */}
             <Suspense fallback={<PageLoader />}>
+            <MarketGate />
             <ScrollToTop />
             <DashboardFAB />
             <VisitTracker />
