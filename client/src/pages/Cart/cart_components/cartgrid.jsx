@@ -3,6 +3,7 @@ import {motion, AnimatePresence} from "framer-motion";
 import {Link, useNavigate} from "react-router-dom";
 import {useCartWishlist} from "../../../components/cartcontext";
 import {useCurrency} from "../../../components/currencycontext";
+import {useDellymanLocations} from "../../../utils/dellymanLocations";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "https://blvckmrktng.com";
 
@@ -177,6 +178,12 @@ function BrandShippingPanel({brand, brandId, items, onSelect, selected, fmtMoney
     if (!selected) return null;
     if (selected.pickupMode) {
       return {text: selected.name, type: "pickup", price: "FREE"};
+    }
+    // Dellyman's placeholder carries flat_rate: 0 until a destination state
+    // is picked (see the "Delivery Destination" selector above the cart
+    // list) — don't show that as "FREE", it's just not quoted yet.
+    if (selected.type === "dellyman" && !selected.destinationState) {
+      return {text: selected.name, type: selected.type, price: "Pending"};
     }
     const rawPrice = Number(selected.flat_rate ?? selected.base_price ?? selected.rate ?? 0);
     const selCur = (selected._currency || selected.currency_code || selected.currency || baseCurrency || "NGN").toUpperCase();
@@ -702,6 +709,12 @@ export default function CartGrid() {
   // handles delivery itself via courier instead of each brand's own
   // zones/local rates. Pickup is unaffected either way.
   const [dellymanMode, setDellymanMode] = useState(false);
+  // Buyer's delivery state — Dellyman prices per state (not city), so
+  // picking just the state here is enough to get a real, live price on the
+  // cart page itself instead of only finding out at checkout.
+  const [destinationState, setDestinationState] = useState("");
+  const [destinationQuote, setDestinationQuote] = useState({loading: false, error: "", breakdown: []});
+  const {states: dellymanStates} = useDellymanLocations();
 
   const navigate = useNavigate();
 
@@ -716,6 +729,50 @@ export default function CartGrid() {
       .then((json) => setDellymanMode((json?.data ?? json)?.delivery_mode === "dellyman"))
       .catch(() => setDellymanMode(false));
   }, []);
+
+  // Live per-brand courier quote for the selected destination state — mirrors
+  // checkout's own dellyman-quote call, just triggered by a state pick
+  // instead of a full address form.
+  useEffect(() => {
+    if (!dellymanMode || !destinationState || items.length === 0) return;
+    let cancelled = false;
+    setDestinationQuote({loading: true, error: "", breakdown: []});
+    fetch(`${API_BASE}/api/checkout/dellyman-quote`, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        items: items.map((i) => ({product_id: i.productId, quantity: i.qty})),
+        state: destinationState,
+        country: "Nigeria",
+      }),
+    })
+      .then(async (r) => {
+        const json = await r.json();
+        if (!r.ok) throw new Error(json?.error || json?.message || "Couldn't price delivery for this state");
+        return json?.data ?? json;
+      })
+      .then((data) => {
+        if (cancelled) return;
+        const breakdown = data?.breakdown || [];
+        setDestinationQuote({loading: false, error: "", breakdown});
+        setBrandShipping((prev) => {
+          const next = {...prev};
+          for (const b of breakdown) {
+            next[b.brand_id] = {
+              ...DELLYMAN_DELIVERY_METHOD,
+              flat_rate: b.price,
+              company: b.company,
+              destinationState,
+            };
+          }
+          return next;
+        });
+      })
+      .catch((err) => {
+        if (!cancelled) setDestinationQuote({loading: false, error: err.message || "Couldn't price delivery for this state", breakdown: []});
+      });
+    return () => { cancelled = true; };
+  }, [destinationState, dellymanMode, items.length]); // eslint-disable-line
 
   useEffect(() => {
     if (!Array.isArray(cartItems) || !cartItems.length) {
@@ -971,6 +1028,53 @@ export default function CartGrid() {
                   <span style={{color: "#ef4444", fontSize: 11, lineHeight: 1.5}}>{qtyError}</span>
                 </motion.div>
               )}
+
+              {dellymanMode && (
+                <div style={{
+                  padding: "14px 16px", borderRadius: 10, marginBottom: 20,
+                  background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)",
+                }}>
+                  <div style={{display: "flex", alignItems: "center", gap: 8, marginBottom: 10}}>
+                    <PinIcon />
+                    <span style={{
+                      color: "rgba(255,255,255,0.5)", fontSize: 10,
+                      fontWeight: 900, letterSpacing: "0.18em", textTransform: "uppercase",
+                    }}>
+                      Delivery Destination
+                    </span>
+                  </div>
+                  <select
+                    value={destinationState}
+                    onChange={(e) => setDestinationState(e.target.value)}
+                    style={{
+                      width: "100%", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.15)",
+                      borderRadius: 8, color: "#fff", fontSize: 13, padding: "10px 12px",
+                    }}>
+                    <option value="">Select your state…</option>
+                    {Object.keys(dellymanStates).sort().map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                  {destinationQuote.loading ? (
+                    <p style={{color: "rgba(255,255,255,0.4)", fontSize: 11, margin: "10px 0 0"}}>
+                      Pricing delivery to {destinationState}…
+                    </p>
+                  ) : destinationQuote.error ? (
+                    <p style={{color: "#ef4444", fontSize: 11, margin: "10px 0 0", lineHeight: 1.6}}>
+                      {destinationQuote.error}
+                    </p>
+                  ) : destinationState ? (
+                    <p style={{color: "rgba(255,255,255,0.4)", fontSize: 11, margin: "10px 0 0", lineHeight: 1.6}}>
+                      Courier prices below now reflect delivery to <strong style={{color: "#fff"}}>{destinationState}</strong> state.
+                    </p>
+                  ) : (
+                    <p style={{color: "rgba(255,255,255,0.3)", fontSize: 11, margin: "10px 0 0"}}>
+                      Pick your state to see real courier prices for your Acquired Items below.
+                    </p>
+                  )}
+                </div>
+              )}
+
               {brandGroupList.map((group) => (
                 <div key={group.brandId ?? group.brand} className="brand-container">
                   <div className="brand-header">

@@ -2179,7 +2179,7 @@ if (!delivery.country_code && geoLoaded) {
                           background: "rgba(239,68,68,0.05)", border: "1px solid rgba(239,68,68,0.2)",
                         }}>
                           <p style={{color: "#fff", fontSize: 12, fontWeight: 700, margin: "0 0 4px"}}>
-                            🚚 Courier delivery
+                            🚚 Delivery to your state
                           </p>
                           {dellymanQuote.loading ? (
                             <p style={{color: "rgba(255,255,255,0.4)", fontSize: 11, margin: 0}}>Pricing delivery for your address…</p>

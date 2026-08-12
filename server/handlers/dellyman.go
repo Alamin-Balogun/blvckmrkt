@@ -661,9 +661,13 @@ type checkoutDellymanQuoteItem struct {
 type checkoutDellymanQuoteRequest struct {
 	Items   []checkoutDellymanQuoteItem `json:"items" binding:"required,min=1"`
 	Address string                      `json:"address"`
-	City    string                      `json:"city"    binding:"required"`
-	State   string                      `json:"state"`
-	Country string                      `json:"country" binding:"required"`
+	// City is optional — Dellyman prices per state, not city (confirmed:
+	// identical price across different cities in the same state), so a
+	// state-only preview (e.g. the cart page's destination-state dropdown,
+	// before a full address is collected at checkout) is a valid quote too.
+	City    string `json:"city"`
+	State   string `json:"state" binding:"required"`
+	Country string `json:"country" binding:"required"`
 }
 
 type checkoutDellymanBrandQuote struct {
@@ -710,7 +714,14 @@ func CheckoutDellymanQuote(c *gin.Context) {
 		brandTotals[product.BrandID] += product.Price * float64(it.Quantity)
 	}
 
-	deliveryAddress := formatDellymanAddress(req.Address, req.City, req.State, req.Country)
+	city := req.City
+	if city == "" {
+		// State-only preview (e.g. the cart page) — Dellyman still expects an
+		// address string to geocode, and since price is state-invariant
+		// anyway, the state name itself is a safe stand-in for the city.
+		city = req.State
+	}
+	deliveryAddress := formatDellymanAddress(req.Address, city, req.State, req.Country)
 	quotes, total, err := quoteDellymanForBrands(database.DB, brandTotals, brandOrder, deliveryAddress)
 	if err != nil {
 		utils.BadRequest(c, err.Error(), nil)
