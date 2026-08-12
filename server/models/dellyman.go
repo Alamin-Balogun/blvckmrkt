@@ -7,9 +7,9 @@ import "time"
 type DellymanShipmentStatus string
 
 const (
-	DellymanQuoted    DellymanShipmentStatus = "quoted"    // quote obtained, order not yet booked
-	DellymanBooked    DellymanShipmentStatus = "booked"    // BookOrder succeeded, awaiting pickup
-	DellymanPicked    DellymanShipmentStatus = "picked"    // rider picked up the package (in transit)
+	DellymanQuoted    DellymanShipmentStatus = "quoted" // quote obtained, order not yet booked
+	DellymanBooked    DellymanShipmentStatus = "booked" // BookOrder succeeded, awaiting pickup
+	DellymanPicked    DellymanShipmentStatus = "picked" // rider picked up the package (in transit)
 	DellymanDelivered DellymanShipmentStatus = "delivered"
 	DellymanCancelled DellymanShipmentStatus = "cancelled"
 	DellymanFailed    DellymanShipmentStatus = "failed" // booking attempt errored
@@ -21,17 +21,24 @@ const (
 // pair — unlike OrderPickup/OrderZoneDelivery/OrderLocalDelivery which are
 // 1:1 with an order today.
 type OrderDellymanDelivery struct {
-	ID              uint      `gorm:"primaryKey;autoIncrement"                json:"id"`
-	OrderID         uint      `gorm:"not null;index"                          json:"order_id"`
-	BrandID         uint      `gorm:"not null;index"                          json:"brand_id"`
+	ID      uint `gorm:"primaryKey;autoIncrement"                json:"id"`
+	OrderID uint `gorm:"not null;index"                          json:"order_id"`
+	BrandID uint `gorm:"not null;index"                          json:"brand_id"`
 	// PickupAddressID references addresses.id — the brand's Address row
 	// flagged IsDellymanPickup, not the buyer-facing PickupLocation model.
-	PickupAddressID uint      `gorm:"not null"                                json:"pickup_address_id"`
+	PickupAddressID uint `gorm:"not null"                                json:"pickup_address_id"`
 
-	// Destination snapshot (buyer)
+	// Destination snapshot (buyer). DeliveryAddress is the full formatted
+	// string sent to Dellyman's API; City/State/Country are kept separately
+	// too since Dellyman prices per state (see quoteDellymanForBrands) and
+	// admin needs the state on its own to know when a shipment has reached
+	// it and to key the final-destination fee conversation with Dellyman.
 	DeliveryContactName  string `gorm:"type:varchar(200)"                      json:"delivery_contact_name"`
 	DeliveryContactPhone string `gorm:"type:varchar(50)"                       json:"delivery_contact_phone"`
 	DeliveryAddress      string `gorm:"type:varchar(500);not null"             json:"delivery_address"`
+	DeliveryCity         string `gorm:"type:varchar(150)"                      json:"delivery_city,omitempty"`
+	DeliveryState        string `gorm:"type:varchar(150)"                      json:"delivery_state,omitempty"`
+	DeliveryCountry      string `gorm:"type:varchar(150)"                      json:"delivery_country,omitempty"`
 	DeliveryLandmark     string `gorm:"type:varchar(200)"                      json:"delivery_landmark,omitempty"`
 
 	// Quote/booking snapshot
@@ -59,3 +66,41 @@ type OrderDellymanDelivery struct {
 }
 
 func (OrderDellymanDelivery) TableName() string { return "order_dellyman_deliveries" }
+
+// DellymanFinalChargeStatus tracks the buyer-facing final-destination fee
+// through payment.
+type DellymanFinalChargeStatus string
+
+const (
+	FinalChargePending DellymanFinalChargeStatus = "pending"
+	FinalChargePaid    DellymanFinalChargeStatus = "paid"
+)
+
+// DellymanFinalCharge is the extra state→exact-destination courier fee an
+// admin negotiates with Dellyman by hand over WhatsApp once a brand's
+// shipment has reached the buyer's state (Dellyman only prices pickup→state
+// at checkout — see the package comment on quoteDellymanForBrands). Kept as
+// its own row rather than a field bolted onto OrderDellymanDelivery.Price,
+// since that field already means "the courier price charged at checkout"
+// and this is a separate, later, buyer-initiated payment.
+type DellymanFinalCharge struct {
+	ID         uint `gorm:"primaryKey;autoIncrement"       json:"id"`
+	DeliveryID uint `gorm:"not null;uniqueIndex"           json:"delivery_id"`
+	OrderID    uint `gorm:"not null;index"                 json:"order_id"`
+	// UserID is nil for guest checkout orders — see Order.UserID. The email
+	// link works either way; only the in-app notification needs an account.
+	UserID   *uint   `gorm:"index"                          json:"user_id,omitempty"`
+	Amount   float64 `gorm:"type:decimal(10,2);not null"    json:"amount"`
+	Currency string  `gorm:"type:varchar(10);default:'NGN'" json:"currency"`
+
+	Reference  string `gorm:"uniqueIndex;type:varchar(64);not null" json:"reference"`
+	PaymentURL string `gorm:"type:varchar(500)"                     json:"payment_url"`
+
+	Status DellymanFinalChargeStatus `gorm:"type:varchar(20);default:'pending';index" json:"status"`
+	PaidAt *time.Time                `                                                 json:"paid_at,omitempty"`
+
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+func (DellymanFinalCharge) TableName() string { return "dellyman_final_charges" }

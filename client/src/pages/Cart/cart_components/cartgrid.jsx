@@ -66,12 +66,14 @@ const ClockIcon = () => (
 // Placeholder shown instead of a brand's own zones/local rates once the
 // platform is handling delivery itself via Dellyman — the real price is a
 // live courier quote fetched on the checkout page (it needs the buyer's
-// address, which isn't collected yet at this point in the flow).
+// address, which isn't collected yet at this point in the flow). Covers
+// pickup from the brand through delivery to the buyer's state — the
+// state→exact-address leg is billed separately once the order arrives.
 const DELLYMAN_DELIVERY_METHOD = {
   id: "dellyman",
   type: "dellyman",
-  name: "Courier delivery",
-  description: "Priced live at checkout based on your delivery address.",
+  name: "Delivery to your state",
+  description: "Covers pickup from the brand and delivery to your state — priced live at checkout.",
   flat_rate: 0,
 };
 
@@ -209,6 +211,18 @@ function BrandShippingPanel({brand, brandId, items, onSelect, selected, fmtMoney
           }}>✓ SELECTED</span>
         )}
       </div>
+
+      {dellymanMode && (
+        <div style={{
+          padding: "10px 12px", borderRadius: 8, marginBottom: 8,
+          background: "rgba(255,193,7,0.06)", border: "1px solid rgba(255,193,7,0.25)",
+        }}>
+          <p style={{color: "#ffc107", fontSize: 11, fontWeight: 700, margin: 0, lineHeight: 1.6}}>
+            ⚠️ Covers pickup and delivery to your state only — not your exact address. The final
+            delivery fee to your door is sent to you once your order reaches your state.
+          </p>
+        </div>
+      )}
 
       {/* Selector */}
       <div style={{

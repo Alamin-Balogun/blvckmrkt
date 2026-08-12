@@ -89,6 +89,10 @@ func RegisterAdmin(r *gin.Engine) {
 		api.GET("/orders/:id/payout-info", handlers.AdminGetOrderPayoutInfo)
 		api.POST("/orders/:id/initiate-payout", handlers.AdminInitiatePayout)
 
+		// Dellyman final-destination fee (state → exact address, negotiated
+		// with the courier by hand once a shipment reaches the buyer's state)
+		api.POST("/dellyman-deliveries/:id/final-price", handlers.AdminSetDellymanFinalPrice)
+
 		// ── Payout Management ─────────────────────────────────────────────────
 		api.GET("/payouts", handlers.AdminListPayouts)
 		api.GET("/payouts/:id", handlers.AdminGetPayout)

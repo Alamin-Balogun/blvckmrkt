@@ -467,6 +467,17 @@ func buildAdminDellymanDetails(rows []models.OrderDellymanDelivery) []gin.H {
 		addrMap[a.ID] = a
 	}
 
+	deliveryIDs := make([]uint, 0, len(rows))
+	for _, r := range rows {
+		deliveryIDs = append(deliveryIDs, r.ID)
+	}
+	var finalCharges []models.DellymanFinalCharge
+	database.DB.Where("delivery_id IN ?", deliveryIDs).Find(&finalCharges)
+	finalChargeMap := map[uint]models.DellymanFinalCharge{}
+	for _, fc := range finalCharges {
+		finalChargeMap[fc.DeliveryID] = fc
+	}
+
 	out := make([]gin.H, len(rows))
 	for i, r := range rows {
 		b := brandMap[r.BrandID]
@@ -479,7 +490,8 @@ func buildAdminDellymanDetails(rows []models.OrderDellymanDelivery) []gin.H {
 			parts = append(parts, a.City, a.Country)
 			pickupAddress = strings.Join(parts, ", ")
 		}
-		out[i] = gin.H{
+		entry := gin.H{
+			"id":                     r.ID,
 			"brand_id":               r.BrandID,
 			"brand_name":             b.BrandName,
 			"brand_email":            b.Email,
@@ -487,6 +499,9 @@ func buildAdminDellymanDetails(rows []models.OrderDellymanDelivery) []gin.H {
 			"delivery_contact_name":  r.DeliveryContactName,
 			"delivery_contact_phone": r.DeliveryContactPhone,
 			"delivery_address":       r.DeliveryAddress,
+			"delivery_city":          r.DeliveryCity,
+			"delivery_state":         r.DeliveryState,
+			"delivery_country":       r.DeliveryCountry,
 			"delivery_landmark":      r.DeliveryLandmark,
 			"courier_company":        r.CompanyName,
 			"vehicle":                r.Vehicle,
@@ -498,6 +513,16 @@ func buildAdminDellymanDetails(rows []models.OrderDellymanDelivery) []gin.H {
 			"picked_up_at":           r.PickedUpAt,
 			"delivered_at":           r.DeliveredAt,
 		}
+		if fc, ok := finalChargeMap[r.ID]; ok {
+			entry["final_charge"] = gin.H{
+				"amount":      fc.Amount,
+				"currency":    fc.Currency,
+				"status":      fc.Status,
+				"payment_url": fc.PaymentURL,
+				"paid_at":     fc.PaidAt,
+			}
+		}
+		out[i] = entry
 	}
 	return out
 }

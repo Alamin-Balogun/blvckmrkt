@@ -1422,6 +1422,144 @@ func buildGoodsDeliveredEmail(d GoodsDeliveredData) string {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Final Destination Fee — once a brand's Dellyman shipment reaches the
+// buyer's state, admin negotiates the last-mile state→exact-address price
+// with Dellyman by hand (over WhatsApp) and types it in. This emails the
+// buyer that price with a Pay link/button.
+// ─────────────────────────────────────────────────────────────────────────────
+
+type FinalDestinationPriceData struct {
+	BuyerName  string
+	BuyerEmail string
+	OrderID    string // display id
+	State      string
+	City       string
+	Amount     float64
+	Currency   string
+	PaymentURL string
+}
+
+// SendFinalDestinationPriceEmail notifies a buyer that their order has
+// reached their state and gives them the agreed final-mile delivery fee,
+// with a link to pay it.
+func SendFinalDestinationPriceEmail(d FinalDestinationPriceData) error {
+	apiKey := os.Getenv("RESEND_API_KEY")
+	if apiKey == "" {
+		return fmt.Errorf("RESEND_API_KEY not set")
+	}
+
+	client := resend.NewClient(apiKey)
+	from := fmt.Sprintf("%s <%s>", config.App.EmailFromName, config.App.EmailFrom)
+
+	params := &resend.SendEmailRequest{
+		From:    from,
+		To:      []string{d.BuyerEmail},
+		Subject: fmt.Sprintf("📦 Your order %s has reached %s — final delivery fee", d.OrderID, d.State),
+		Html:    buildFinalDestinationPriceEmail(d),
+	}
+
+	_, err := client.Emails.Send(params)
+	return err
+}
+
+func buildFinalDestinationPriceEmail(d FinalDestinationPriceData) string {
+	destination := d.State
+	if d.City != "" {
+		destination = d.City + ", " + d.State
+	}
+	return fmt.Sprintf(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Final Delivery Fee</title>
+</head>
+<body style="margin:0;padding:0;background:#0a0a0a;font-family:system-ui,-apple-system,sans-serif;">
+  <table width="100%%" cellpadding="0" cellspacing="0" style="background:#0a0a0a;padding:40px 20px;">
+    <tr><td align="center">
+      <table width="520" cellpadding="0" cellspacing="0"
+        style="background:#111;border:1px solid rgba(255,255,255,0.08);border-radius:16px;overflow:hidden;max-width:520px;width:100%%;">
+
+        <tr><td style="background:#0d0d0d;padding:28px 36px;border-bottom:1px solid rgba(255,255,255,0.06);">
+          <table width="100%%" cellpadding="0" cellspacing="0"><tr>
+            <td><img src="https://blvckmrktng.com/logo.png" alt="BLVCKMRKT" height="28" style="display:block;height:28px;width:auto;"></td>
+            <td align="right">
+              <span style="background:rgba(239,68,68,0.15);color:#ef4444;font-size:10px;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;padding:5px 12px;border-radius:20px;border:1px solid rgba(239,68,68,0.3);">
+                Action needed
+              </span>
+            </td>
+          </tr></table>
+        </td></tr>
+
+        <tr><td style="padding:36px 36px 28px;">
+
+          <p style="color:rgba(255,255,255,0.4);font-size:11px;font-weight:700;letter-spacing:0.3em;text-transform:uppercase;margin:0 0 12px;">
+            Final Delivery Fee
+          </p>
+          <h1 style="color:#fff;font-size:22px;margin:0 0 10px;line-height:1.3;">
+            Your order has reached %s 📍
+          </h1>
+          <p style="color:rgba(255,255,255,0.45);font-size:13px;line-height:1.7;margin:0 0 24px;">
+            Your order <strong style="color:#fff;">%s</strong> has arrived in your state. To complete delivery to
+            your exact address, we agreed a final delivery fee with our courier — pay it below and it'll be on its way to you.
+          </p>
+
+          <div style="background:#0a0a0a;border:1px solid rgba(239,68,68,0.25);border-radius:10px;padding:20px;margin-bottom:24px;text-align:center;">
+            <p style="color:rgba(255,255,255,0.4);font-size:11px;margin:0 0 6px;text-transform:uppercase;letter-spacing:0.15em;">Final delivery fee</p>
+            <p style="color:#fff;font-size:28px;font-weight:800;margin:0;">%s %s</p>
+          </div>
+
+          <table width="100%%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+            <tr><td align="center">
+              <a href="%s" style="display:inline-block;background:#ef4444;color:#fff;font-size:12px;font-weight:800;letter-spacing:0.15em;text-transform:uppercase;text-decoration:none;padding:14px 32px;border-radius:8px;">
+                Pay Now →
+              </a>
+            </td></tr>
+          </table>
+
+          <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:14px 18px;">
+            <p style="color:rgba(255,255,255,0.3);font-size:12px;margin:0;line-height:1.6;">
+              This is separate from the courier fee you already paid at checkout, which only covered pickup and delivery to your state.
+            </p>
+          </div>
+
+        </td></tr>
+
+        <tr><td style="background:#0d0d0d;padding:20px 36px;border-top:1px solid rgba(255,255,255,0.06);">
+          <p style="color:rgba(255,255,255,0.2);font-size:11px;margin:0;line-height:1.6;">
+            © 2026 BLVCKMRKT &nbsp;·&nbsp; Automated message — please do not reply.
+          </p>
+        </td></tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+		destination, d.OrderID, d.Currency, humanizeAmount(d.Amount), d.PaymentURL,
+	)
+}
+
+// humanizeAmount renders a naira-style amount with thousands separators and
+// no decimals when it's a whole number (e.g. 4500 -> "4,500", 4500.5 -> "4,500.50").
+func humanizeAmount(v float64) string {
+	whole := int64(v)
+	frac := v - float64(whole)
+	s := fmt.Sprintf("%d", whole)
+	out := ""
+	for i, c := range s {
+		if i > 0 && (len(s)-i)%3 == 0 {
+			out += ","
+		}
+		out += string(c)
+	}
+	if frac > 0.001 {
+		out += fmt.Sprintf(".%02.0f", frac*100)
+	}
+	return out
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Dellyman Manual-Cancellation Alert — Dellyman has no cancel-order API
 // endpoint, so once a booked/picked shipment's order is cancelled on our
 // side, ops needs to be told to go cancel it by hand in the Dellyman app.

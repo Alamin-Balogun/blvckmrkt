@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/Alamin-Balogun/blvckmrkt/database"
 	"github.com/Alamin-Balogun/blvckmrkt/models"
@@ -114,7 +115,12 @@ func handlePaystackChargeSuccess(data map[string]interface{}) {
 
 	var intent models.PaymentIntent
 	if err := database.DB.Where("tx_ref = ?", reference).First(&intent).Error; err != nil {
-		return // no parked intent for this reference — nothing for us to build
+		// Not an order-checkout intent — check for a Dellyman final-
+		// destination fee instead (see handlers/dellyman.go), which is the
+		// safety net for that "Pay Now" email link in case the buyer's tab
+		// closes before FinalizeDellymanFinalCharge's own client call runs.
+		handleFinalDeliveryFeeChargeSuccess(reference)
+		return
 	}
 	if intent.Status == models.IntentCompleted {
 		return // already finalized by the frontend callback
@@ -125,6 +131,22 @@ func handlePaystackChargeSuccess(data map[string]interface{}) {
 		return
 	}
 	log.Printf("✅ Order confirmed via Paystack webhook safety net: %s", reference)
+}
+
+func handleFinalDeliveryFeeChargeSuccess(reference string) {
+	var charge models.DellymanFinalCharge
+	if err := database.DB.Where("reference = ?", reference).First(&charge).Error; err != nil {
+		return // no matching charge either — nothing for us to do
+	}
+	if charge.Status == models.FinalChargePaid {
+		return
+	}
+	now := time.Now()
+	database.DB.Model(&charge).Updates(map[string]interface{}{
+		"status":  models.FinalChargePaid,
+		"paid_at": &now,
+	})
+	log.Printf("✅ Final delivery fee confirmed via Paystack webhook safety net: %s", reference)
 }
 
 func handlePaystackChargeFailed(data map[string]interface{}) {

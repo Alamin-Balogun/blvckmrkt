@@ -74,7 +74,7 @@ function CopyRow({label, value, highlight}) {
 export default function PaymentCallback() {
   const location = useLocation();
   const {refreshCart} = useCartWishlist();
-  const [state, setState] = useState("loading"); // loading | success | error | unknown
+  const [state, setState] = useState("loading"); // loading | success | error | unknown | fee-success
   const [orderRef, setOrderRef] = useState("");
   const [orderTotal, setOrderTotal] = useState(null);
   const [orderCurrency, setOrderCurrency] = useState("");
@@ -92,6 +92,36 @@ export default function PaymentCallback() {
       params.get("gateway") ||
       (params.get("tx_ref") ? "flutterwave" : params.get("reference") ? "paystack" : "");
     setGateway(gw);
+
+    // Dellyman final-destination fee — reached from the "Pay Now" link in a
+    // notification/email, not from checkout, so it's public (no auth
+    // required, works for guest buyers too) and doesn't build a new order.
+    if (gw === "final-delivery-fee") {
+      const ref = params.get("reference") || params.get("trxref");
+      setPaymentRef(ref || "");
+      if (!ref) {
+        setState("error");
+        setErrorMsg("Missing payment reference.");
+        return;
+      }
+      fetch(`${API_BASE}/api/checkout/final-delivery-fee/finalize`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({reference: ref}),
+      })
+        .then(async (res) => {
+          const json = await res.json();
+          if (!res.ok) throw new Error(json.error || json.message || "Payment could not be confirmed");
+          setOrderTotal(json?.data?.charge?.amount ?? null);
+          setOrderCurrency(json?.data?.charge?.currency ?? "");
+          setState("fee-success");
+        })
+        .catch((err) => {
+          setState("error");
+          setErrorMsg(err.message || "Payment could not be confirmed automatically.");
+        });
+      return;
+    }
 
     const finalize = async () => {
       const token = getToken();
@@ -315,6 +345,88 @@ export default function PaymentCallback() {
                 Back to Home
               </Link>
             </div>
+          </>
+        )}
+
+        {state === "fee-success" && (
+          <>
+            <motion.div
+              initial={{scale: 0}}
+              animate={{scale: 1}}
+              transition={{type: "spring", stiffness: 260, damping: 20}}
+              style={{
+                width: 80,
+                height: 80,
+                borderRadius: "50%",
+                background: "rgba(34,197,94,0.1)",
+                border: "2px solid rgba(34,197,94,0.4)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                margin: "0 auto 28px",
+              }}>
+              <svg width="36" height="36" fill="none" stroke="#22c55e" strokeWidth="2.5" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            </motion.div>
+            <p
+              style={{
+                color: "rgba(255,255,255,0.3)",
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: "0.3em",
+                textTransform: "uppercase",
+                marginBottom: 10,
+              }}>
+              Final Delivery Fee Paid
+            </p>
+            <h1
+              style={{
+                fontFamily: "'Bebas Neue', sans-serif",
+                fontSize: "clamp(2.2rem, 6vw, 3.4rem)",
+                color: "#fff",
+                letterSpacing: "0.05em",
+                lineHeight: 1,
+                marginBottom: 16,
+              }}>
+              ON ITS WAY TO <span style={{color: "#ef4444"}}>YOU!</span>
+            </h1>
+            <p style={{color: "rgba(255,255,255,0.38)", fontSize: 13, lineHeight: 1.7, marginBottom: 24}}>
+              Thanks — your final delivery fee has been received. Our courier will complete delivery to your
+              exact address shortly.
+            </p>
+            <div
+              style={{
+                background: "#0d0d0d",
+                border: "1px solid rgba(255,255,255,0.08)",
+                borderRadius: 12,
+                padding: "6px 20px",
+                marginBottom: 24,
+                textAlign: "left",
+              }}>
+              <CopyRow label="Payment Reference" value={paymentRef} highlight />
+              {orderTotal != null && (
+                <CopyRow label="Amount Paid" value={`${orderCurrency} ${Number(orderTotal).toLocaleString()}`.trim()} />
+              )}
+            </div>
+            <Link
+              to="/"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                background: "#ef4444",
+                color: "#fff",
+                fontSize: 11,
+                fontWeight: 900,
+                letterSpacing: "0.22em",
+                textTransform: "uppercase",
+                padding: "13px 28px",
+                textDecoration: "none",
+                borderRadius: 6,
+              }}>
+              Back to Home
+            </Link>
           </>
         )}
 

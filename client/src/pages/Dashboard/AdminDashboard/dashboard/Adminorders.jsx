@@ -15,6 +15,7 @@ import {
   getProducts,
   getAdminPickupLocations,
   sendReceiptEmail,
+  adminSetDellymanFinalPrice,
 } from "../dashboard/dashboard_components/api";
 import {AdminTable, Badge, SearchBar, ConfirmModal} from "./Components";
 
@@ -1097,6 +1098,79 @@ function PayBrandButton({order, onPayoutClick, onMarkComplete, toast}) {
   );
 }
 
+// Final-destination fee input — the state → exact address leg admin
+// negotiates with Dellyman by hand over WhatsApp once a shipment reaches the
+// buyer's state. Submitting emails/notifies the buyer with a Pay link.
+function DellymanFinalPriceBox({delivery, onSet, toast}) {
+  const [amount, setAmount] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const fc = delivery.final_charge;
+  const paid = fc?.status === "paid";
+
+  const submit = async () => {
+    const val = Number(amount);
+    if (!val || val <= 0) {
+      toast?.error?.("Invalid amount", "Enter a valid amount greater than 0");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const result = await adminSetDellymanFinalPrice(delivery.id, val);
+      onSet(delivery.id, result?.charge || result);
+      setAmount("");
+      toast?.success?.("Sent to buyer", "The final delivery fee was emailed and notified to the buyer with a pay link.");
+    } catch (err) {
+      toast?.error?.("Failed to set final price", err.message || "Please try again");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div style={{marginTop: 10, paddingTop: 10, borderTop: "1px dashed rgba(139,92,246,0.2)"}}>
+      <SectionHeader style={{margin: "0 0 6px"}}>Final Destination Fee</SectionHeader>
+      {fc ? (
+        <div style={{display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 8}}>
+          <span style={{color: "rgba(255,255,255,0.6)", fontSize: 12, fontWeight: 700}}>
+            {fc.currency === "NGN" ? "₦" : `${fc.currency} `}{Number(fc.amount).toLocaleString()}
+          </span>
+          <Badge label={fc.status} color={paid ? "#22c55e" : "#f59e0b"} />
+        </div>
+      ) : (
+        <p style={{color: "rgba(255,255,255,0.3)", fontSize: 11, margin: "0 0 8px"}}>
+          Not set yet — buyer hasn't been billed for the final leg to their exact address.
+        </p>
+      )}
+      {!paid && (
+        <div style={{display: "flex", gap: 8}}>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            placeholder={fc ? "Re-price…" : "Amount agreed with Dellyman"}
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            style={{
+              flex: 1, background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: 6, color: "#fff", fontSize: 12, padding: "7px 10px",
+            }}
+          />
+          <button
+            onClick={submit}
+            disabled={submitting}
+            style={{
+              background: "#ef4444", color: "#fff", border: "none", borderRadius: 6,
+              fontSize: 11, fontWeight: 700, padding: "0 14px", cursor: submitting ? "default" : "pointer",
+              opacity: submitting ? 0.6 : 1,
+            }}>
+            {submitting ? "Sending…" : fc ? "Re-send" : "Send"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Order detail drawer ───────────────────────────────────────────────────────
 function OrderDrawer({orderId, onClose, onStatusChange, onPaymentStatusChange, onDelete, onPayoutClick, toast}) {
   const [data, setData] = useState(null);
@@ -1122,6 +1196,16 @@ function OrderDrawer({orderId, onClose, onStatusChange, onPaymentStatusChange, o
   const deliveryDetails = data?.delivery_details;
   const dellymanDeliveries = data?.dellyman_deliveries || [];
   const paymentDetails = data?.payment_details;
+
+  const handleFinalChargeSet = (deliveryId, charge) => {
+    setData((prev) => {
+      if (!prev) return prev;
+      const updated = (prev.dellyman_deliveries || []).map((d) =>
+        d.id === deliveryId ? {...d, final_charge: charge} : d
+      );
+      return {...prev, dellyman_deliveries: updated};
+    });
+  };
 
   const handleStatus = async (status) => {
     setUpdating(true);
@@ -1373,15 +1457,18 @@ function OrderDrawer({orderId, onClose, onStatusChange, onPaymentStatusChange, o
                     <InfoRow label="Contact Name" value={d.delivery_contact_name} />
                     <InfoRow label="Contact Phone" value={d.delivery_contact_phone} />
                     <InfoRow label="Address" value={d.delivery_address} />
+                    {d.delivery_state && <InfoRow label="State" value={d.delivery_state} />}
+                    {d.delivery_city && <InfoRow label="City" value={d.delivery_city} />}
                     {d.delivery_landmark && <InfoRow label="Landmark" value={d.delivery_landmark} />}
                     <SectionHeader style={{margin: "10px 0 2px"}}>Courier</SectionHeader>
                     <InfoRow label="Company" value={d.courier_company} />
                     <InfoRow label="Vehicle" value={d.vehicle} />
-                    <InfoRow label="Price" value={`${d.currency === "NGN" ? "₦" : d.currency || ""}${Number(d.price || 0).toLocaleString()}`} />
+                    <InfoRow label="Price (pickup → state)" value={`${d.currency === "NGN" ? "₦" : d.currency || ""}${Number(d.price || 0).toLocaleString()}`} />
                     <InfoRow label="Dellyman Order ID" value={d.dellyman_order_id} />
                     <InfoRow label="Tracking ID" value={d.tracking_id} />
                     {d.picked_up_at && <InfoRow label="Picked Up" value={fmtDate(d.picked_up_at, true)} />}
                     {d.delivered_at && <InfoRow label="Delivered" value={fmtDate(d.delivered_at, true)} />}
+                    <DellymanFinalPriceBox delivery={d} onSet={handleFinalChargeSet} toast={toast} />
                   </div>
                 ))}
               </>

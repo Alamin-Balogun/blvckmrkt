@@ -89,8 +89,8 @@ function CopyRow({label, value, highlight}) {
 const DELLYMAN_DELIVERY_METHOD = {
   id: "dellyman",
   type: "dellyman",
-  name: "Courier delivery",
-  description: "Priced live based on your delivery address.",
+  name: "Delivery to your state",
+  description: "Covers pickup from the brand and delivery to your state — priced live based on your address.",
   flat_rate: 0,
 };
 
@@ -2126,6 +2126,18 @@ if (!delivery.country_code && geoLoaded) {
                       <p className="co-section-title" style={{marginTop: 28}}>
                         Shipping Method
                       </p>
+                      {dellymanMode && (
+                        <div style={{
+                          padding: "12px 14px", borderRadius: 10, marginBottom: 14,
+                          background: "rgba(255,193,7,0.06)", border: "1px solid rgba(255,193,7,0.25)",
+                        }}>
+                          <p style={{color: "#ffc107", fontSize: 12, fontWeight: 800, margin: 0, lineHeight: 1.6}}>
+                            ⚠️ This price only covers pickup and delivery to your state — not your exact address.
+                            Once your order reaches your state, we'll send you the final delivery fee to complete
+                            delivery to your door.
+                          </p>
+                        </div>
+                      )}
                       {passedBrandShippingMap ? (
                         /* ── CART FLOW: per-brand interactive shipping panel ── */
                         <div>

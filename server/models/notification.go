@@ -24,18 +24,23 @@ const (
 // ─────────────────────────────────────────────────────────────────────────────
 
 type Notification struct {
-	ID        uint           `gorm:"primaryKey;autoIncrement"           json:"id"`
-	UserID    uint           `gorm:"not null;index"                     json:"user_id"`
-	Type      NotifType      `gorm:"type:varchar(50);default:'news'"    json:"type"`
-	Title     string         `gorm:"type:varchar(255);not null"         json:"title"`
-	Body      string         `gorm:"type:text;not null"                 json:"body"`
-	ImageURL  string         `gorm:"type:varchar(512)"                  json:"image_url,omitempty"`
-	IsRead    bool           `gorm:"default:false"                      json:"is_read"`
-	RefType   string         `gorm:"type:varchar(50)"                   json:"ref_type,omitempty"`
-	RefID     *uint          `gorm:"default:null"                       json:"ref_id,omitempty"`
-	CreatedAt time.Time      `gorm:"autoCreateTime"                     json:"created_at"`
-	UpdatedAt time.Time      `gorm:"autoUpdateTime"                     json:"updated_at"`
-	DeletedAt gorm.DeletedAt `gorm:"index"                              json:"-"`
+	ID       uint      `gorm:"primaryKey;autoIncrement"           json:"id"`
+	UserID   uint      `gorm:"not null;index"                     json:"user_id"`
+	Type     NotifType `gorm:"type:varchar(50);default:'news'"    json:"type"`
+	Title    string    `gorm:"type:varchar(255);not null"         json:"title"`
+	Body     string    `gorm:"type:text;not null"                 json:"body"`
+	ImageURL string    `gorm:"type:varchar(512)"                  json:"image_url,omitempty"`
+	IsRead   bool      `gorm:"default:false"                      json:"is_read"`
+	RefType  string    `gorm:"type:varchar(50)"                   json:"ref_type,omitempty"`
+	RefID    *uint     `gorm:"default:null"                       json:"ref_id,omitempty"`
+	// ActionURL/ActionLabel render an optional CTA button on the
+	// notification (e.g. "Pay ₦4,500" linking to a payment page) — most
+	// notifications leave these empty and render as plain text.
+	ActionURL   string         `gorm:"type:varchar(512)"                  json:"action_url,omitempty"`
+	ActionLabel string         `gorm:"type:varchar(100)"                  json:"action_label,omitempty"`
+	CreatedAt   time.Time      `gorm:"autoCreateTime"                     json:"created_at"`
+	UpdatedAt   time.Time      `gorm:"autoUpdateTime"                     json:"updated_at"`
+	DeletedAt   gorm.DeletedAt `gorm:"index"                              json:"-"`
 }
 
 func (Notification) TableName() string { return "notifications" }
@@ -43,28 +48,32 @@ func (Notification) TableName() string { return "notifications" }
 // ToResponse returns a safe response object
 func (n *Notification) ToResponse() NotificationResponse {
 	return NotificationResponse{
-		ID:        n.ID,
-		Type:      string(n.Type),
-		Title:     n.Title,
-		Body:      n.Body,
-		ImageURL:  n.ImageURL,
-		IsRead:    n.IsRead,
-		RefType:   n.RefType,
-		RefID:     n.RefID,
-		CreatedAt: n.CreatedAt,
+		ID:          n.ID,
+		Type:        string(n.Type),
+		Title:       n.Title,
+		Body:        n.Body,
+		ImageURL:    n.ImageURL,
+		IsRead:      n.IsRead,
+		RefType:     n.RefType,
+		RefID:       n.RefID,
+		ActionURL:   n.ActionURL,
+		ActionLabel: n.ActionLabel,
+		CreatedAt:   n.CreatedAt,
 	}
 }
 
 type NotificationResponse struct {
-	ID        uint      `json:"id"`
-	Type      string    `json:"type"`
-	Title     string    `json:"title"`
-	Body      string    `json:"body"`
-	ImageURL  string    `json:"image_url,omitempty"`
-	IsRead    bool      `json:"is_read"`
-	RefType   string    `json:"ref_type,omitempty"`
-	RefID     *uint     `json:"ref_id,omitempty"`
-	CreatedAt time.Time `json:"created_at"`
+	ID          uint      `json:"id"`
+	Type        string    `json:"type"`
+	Title       string    `json:"title"`
+	Body        string    `json:"body"`
+	ImageURL    string    `json:"image_url,omitempty"`
+	IsRead      bool      `json:"is_read"`
+	RefType     string    `json:"ref_type,omitempty"`
+	RefID       *uint     `json:"ref_id,omitempty"`
+	ActionURL   string    `json:"action_url,omitempty"`
+	ActionLabel string    `json:"action_label,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -72,24 +81,28 @@ type NotificationResponse struct {
 // ─────────────────────────────────────────────────────────────────────────────
 
 type NotificationItem struct {
-	ID        uint      `json:"id"`
-	Type      string    `json:"type"` // "news" | "drop" | "order" | "system"
-	Title     string    `json:"title"`
-	Body      string    `json:"body"`
-	ImageURL  string    `json:"image_url,omitempty"`
-	IsRead    bool      `json:"is_read"`
-	CreatedAt time.Time `json:"created_at"`
+	ID          uint      `json:"id"`
+	Type        string    `json:"type"` // "news" | "drop" | "order" | "system"
+	Title       string    `json:"title"`
+	Body        string    `json:"body"`
+	ImageURL    string    `json:"image_url,omitempty"`
+	IsRead      bool      `json:"is_read"`
+	ActionURL   string    `json:"action_url,omitempty"`
+	ActionLabel string    `json:"action_label,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 // Helper: Convert Notification to NotificationItem
 func (n *Notification) ToItem() NotificationItem {
 	return NotificationItem{
-		ID:        n.ID,
-		Type:      string(n.Type),
-		Title:     n.Title,
-		Body:      n.Body,
-		ImageURL:  n.ImageURL,
-		IsRead:    n.IsRead,
-		CreatedAt: n.CreatedAt,
+		ID:          n.ID,
+		Type:        string(n.Type),
+		Title:       n.Title,
+		Body:        n.Body,
+		ImageURL:    n.ImageURL,
+		IsRead:      n.IsRead,
+		ActionURL:   n.ActionURL,
+		ActionLabel: n.ActionLabel,
+		CreatedAt:   n.CreatedAt,
 	}
 }

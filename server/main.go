@@ -74,13 +74,14 @@ func main() {
 		&models.WishlistItem{},
 		&models.Order{},
 		&models.OrderItem{},
-		
+
 		// ✅ ORDER DELIVERY DETAILS
 		&models.OrderPickup{},
 		&models.OrderZoneDelivery{},
 		&models.OrderLocalDelivery{},
 		&models.OrderDellymanDelivery{},
-		
+		&models.DellymanFinalCharge{},
+
 		// ✅ ORDER PAYMENT DETAILS
 		&models.OrderPaymentTransfer{},
 		&models.OrderPaymentGateway{},
@@ -119,7 +120,7 @@ func main() {
 		&models.NewsletterSubscriber{},
 		&models.Newsletter{},
 		&models.NewsletterSend{},
-		
+
 		// ✅ BRAND PAYOUTS & BANK ACCOUNTS
 		&models.BrandBankAccount{},
 		&models.BrandPayout{},
@@ -149,12 +150,12 @@ func main() {
 	r.Use(gin.Logger())
 	r.Use(gin.Recovery())
 	r.Use(middleware.CORS())
-          
-        r.GET("/", func(c *gin.Context) {
-            c.JSON(200, gin.H{
-                "message": "Backend Is Working",
-          })
-        })
+
+	r.GET("/", func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"message": "Backend Is Working",
+		})
+	})
 
 	routes.Register(r)
 	routes.RegisterAdmin(r)

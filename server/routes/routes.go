@@ -26,6 +26,11 @@ func Register(r *gin.Engine) {
 	api.POST("/checkout/dellyman-quote", middleware.RateLimit(60, time.Minute), handlers.CheckoutDellymanQuote)
 	api.GET("/dellyman/locations", middleware.RateLimit(30, time.Minute), handlers.DellymanLocations)
 
+	// Final-destination courier fee — public (paid via an emailed link, which
+	// guest buyers must also be able to use without logging in) and verified
+	// purely by the payment reference, not a session.
+	api.POST("/checkout/final-delivery-fee/finalize", middleware.RateLimit(30, time.Minute), handlers.FinalizeDellymanFinalCharge)
+
 	// ── Site visit tracking (public, fire-and-forget beacon) ───────────────────
 	api.POST("/track/visit", middleware.RateLimit(120, time.Minute), handlers.TrackVisit)
 

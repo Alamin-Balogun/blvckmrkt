@@ -11,7 +11,9 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -169,7 +171,7 @@ func quoteDellymanForBrands(tx *gorm.DB, brandTotals map[uint]float64, brandOrde
 // brand for an already-created order, status "quoted" — booking with the
 // courier itself happens later, once payment is confirmed (see
 // bookDellymanShipmentsForOrder).
-func createDellymanDeliveryRows(tx *gorm.DB, orderID uint, quotes map[uint]dellymanQuote, brandOrder []uint, deliveryAddress, deliveryLandmark, contactName, contactPhone string) error {
+func createDellymanDeliveryRows(tx *gorm.DB, orderID uint, quotes map[uint]dellymanQuote, brandOrder []uint, deliveryAddress, deliveryCity, deliveryState, deliveryCountry, deliveryLandmark, contactName, contactPhone string) error {
 	for _, brandID := range brandOrder {
 		q, ok := quotes[brandID]
 		if !ok {
@@ -182,6 +184,9 @@ func createDellymanDeliveryRows(tx *gorm.DB, orderID uint, quotes map[uint]delly
 			DeliveryContactName:  contactName,
 			DeliveryContactPhone: contactPhone,
 			DeliveryAddress:      deliveryAddress,
+			DeliveryCity:         deliveryCity,
+			DeliveryState:        deliveryState,
+			DeliveryCountry:      deliveryCountry,
 			DeliveryLandmark:     deliveryLandmark,
 			CompanyID:            q.Company.CompanyID,
 			CompanyName:          q.Company.Name,
@@ -453,6 +458,188 @@ func cancelDellymanDeliveriesForOrder(orderID uint) {
 			go sendDellymanCancelAlert(row)
 		}
 	}
+}
+
+// ── Final destination fee ─────────────────────────────────────────────────
+//
+// Dellyman only prices pickup→state at checkout (see quoteDellymanForBrands),
+// so the state→exact-address leg is negotiated by hand with Dellyman over
+// WhatsApp once a brand's shipment reaches the buyer's state. Admin types
+// the agreed amount in here, which generates a fresh Paystack payment link
+// and notifies the buyer in-app and by email with a "Pay Now" button/link.
+
+type adminSetFinalPriceRequest struct {
+	Amount float64 `json:"amount" binding:"required,gt=0"`
+}
+
+// AdminSetDellymanFinalPrice is POST
+// /api/admin/dellyman-deliveries/:id/final-price.
+func AdminSetDellymanFinalPrice(c *gin.Context) {
+	deliveryID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		utils.BadRequest(c, "Invalid delivery ID", nil)
+		return
+	}
+
+	var req adminSetFinalPriceRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.BadRequest(c, "Invalid request: "+err.Error(), nil)
+		return
+	}
+
+	var row models.OrderDellymanDelivery
+	if err := database.DB.First(&row, deliveryID).Error; err != nil {
+		utils.NotFound(c, "Delivery not found")
+		return
+	}
+
+	var order models.Order
+	if err := database.DB.First(&order, row.OrderID).Error; err != nil {
+		utils.NotFound(c, "Order not found")
+		return
+	}
+	if order.ContactEmail == "" {
+		utils.BadRequest(c, "This order has no contact email on file", nil)
+		return
+	}
+
+	currency := order.Currency
+	if currency == "" {
+		currency = "NGN"
+	}
+
+	var existing models.DellymanFinalCharge
+	hasExisting := database.DB.Where("delivery_id = ?", deliveryID).First(&existing).Error == nil
+	if hasExisting && existing.Status == models.FinalChargePaid {
+		utils.Conflict(c, "This final delivery fee has already been paid")
+		return
+	}
+
+	callbackBase := os.Getenv("PAYSTACK_CALLBACK_URL")
+	if callbackBase == "" {
+		callbackBase = os.Getenv("FLUTTERWAVE_REDIRECT_URL")
+	}
+	if callbackBase == "" {
+		utils.InternalError(c, "Payment gateway not configured")
+		return
+	}
+	callbackURL := withQueryParam(callbackBase, "gateway", "final-delivery-fee")
+
+	reference := "FDP-" + uuid.NewString()
+	link, err := createPaystackPaymentLink(reference, req.Amount, currency, order.ContactEmail, callbackURL)
+	if err != nil {
+		log.Printf("❌ Failed to create final-destination-fee payment link for delivery %d: %v", deliveryID, err)
+		utils.InternalError(c, "Failed to create payment link")
+		return
+	}
+
+	charge := existing
+	charge.DeliveryID = uint(deliveryID)
+	charge.OrderID = row.OrderID
+	charge.UserID = order.UserID
+	charge.Amount = req.Amount
+	charge.Currency = currency
+	charge.Reference = reference
+	charge.PaymentURL = link
+	charge.Status = models.FinalChargePending
+	charge.PaidAt = nil
+
+	if hasExisting {
+		err = database.DB.Save(&charge).Error
+	} else {
+		err = database.DB.Create(&charge).Error
+	}
+	if err != nil {
+		log.Printf("❌ Failed to save final-destination charge for delivery %d: %v", deliveryID, err)
+		utils.InternalError(c, "Failed to save charge")
+		return
+	}
+
+	if order.UserID != nil {
+		database.DB.Create(&models.Notification{
+			UserID: *order.UserID,
+			Type:   models.NotifOrder,
+			Title:  fmt.Sprintf("Final delivery fee for order %s", order.DisplayID),
+			Body: fmt.Sprintf(
+				"Your order has reached %s. Pay the final delivery fee of %s %.2f to get it delivered to your address.",
+				row.DeliveryState, currency, req.Amount,
+			),
+			RefType:     "dellyman_final_charge",
+			RefID:       &charge.ID,
+			ActionURL:   link,
+			ActionLabel: fmt.Sprintf("Pay %s %.2f", currency, req.Amount),
+		})
+	}
+
+	go func() {
+		if err := utils.SendFinalDestinationPriceEmail(utils.FinalDestinationPriceData{
+			BuyerEmail: order.ContactEmail,
+			OrderID:    order.DisplayID,
+			State:      row.DeliveryState,
+			City:       row.DeliveryCity,
+			Amount:     req.Amount,
+			Currency:   currency,
+			PaymentURL: link,
+		}); err != nil {
+			log.Printf("⚠️ Failed to send final-destination-price email for delivery %d: %v", deliveryID, err)
+		}
+	}()
+
+	utils.OK(c, "Final delivery fee set — buyer notified", gin.H{"charge": charge})
+}
+
+type finalizeFinalChargeRequest struct {
+	Reference string `json:"reference" binding:"required"`
+}
+
+// FinalizeDellymanFinalCharge is POST
+// /api/checkout/final-delivery-fee/finalize — public (reached from an
+// emailed "Pay Now" link, which guest buyers must also be able to use
+// without logging in), so it's verified purely against the Paystack
+// reference rather than a session, mirroring how guest checkout itself works.
+func FinalizeDellymanFinalCharge(c *gin.Context) {
+	var body finalizeFinalChargeRequest
+	if err := c.ShouldBindJSON(&body); err != nil {
+		utils.BadRequest(c, "Invalid request: "+err.Error(), nil)
+		return
+	}
+
+	var charge models.DellymanFinalCharge
+	if err := database.DB.Where("reference = ?", body.Reference).First(&charge).Error; err != nil {
+		utils.NotFound(c, "Payment not found")
+		return
+	}
+	if charge.Status == models.FinalChargePaid {
+		utils.OK(c, "Already paid", gin.H{"charge": charge})
+		return
+	}
+
+	verification, err := utils.VerifyPaystackPayment(body.Reference)
+	if err != nil {
+		utils.BadRequest(c, "Payment verification failed: "+err.Error(), nil)
+		return
+	}
+	if verification.Data.Status != "success" {
+		utils.BadRequest(c, "Payment was not successful", nil)
+		return
+	}
+	expected := int64(math.Round(charge.Amount * 100))
+	if verification.Data.Amount != expected || !strings.EqualFold(verification.Data.Currency, charge.Currency) {
+		log.Printf("❌ Final-destination-fee amount mismatch for reference=%s: expected=%d %s got=%d %s",
+			body.Reference, expected, charge.Currency, verification.Data.Amount, verification.Data.Currency)
+		utils.BadRequest(c, "Payment amount mismatch — please contact support", nil)
+		return
+	}
+
+	now := time.Now()
+	database.DB.Model(&charge).Updates(map[string]interface{}{
+		"status":  models.FinalChargePaid,
+		"paid_at": &now,
+	})
+	charge.Status = models.FinalChargePaid
+	charge.PaidAt = &now
+
+	utils.OK(c, "Final delivery fee paid — thank you!", gin.H{"charge": charge})
 }
 
 // CheckoutDeliveryMode is GET /api/checkout/delivery-mode — public, so the

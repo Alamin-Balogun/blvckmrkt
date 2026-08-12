@@ -290,8 +290,8 @@ func CreateOrder(c *gin.Context) {
 
 		// ✅ Extract card details if authorization is present (card payments only)
 		if verification.Data.Authorization != nil {
-			paystackCardType = verification.Data.Authorization.CardType  // e.g., "visa", "mastercard"
-			paystackCardLast4 = verification.Data.Authorization.Last4    // e.g., "4081"
+			paystackCardType = verification.Data.Authorization.CardType // e.g., "visa", "mastercard"
+			paystackCardLast4 = verification.Data.Authorization.Last4   // e.g., "4081"
 			log.Printf("💳 Card detected: %s ****%s", paystackCardType, paystackCardLast4)
 		} else {
 			// Non-card payment (bank transfer, USSD, etc.)
@@ -786,7 +786,7 @@ func buildOrder(
 		} else if req.DeliveryMode == "delivery" && req.Delivery != nil && dellymanQuotes != nil {
 			contactName := strings.TrimSpace(req.Delivery.FirstName + " " + req.Delivery.LastName)
 			deliveryAddress := formatDellymanAddress(req.Delivery.Address, req.Delivery.City, req.Delivery.State, req.Delivery.Country)
-			if err := createDellymanDeliveryRows(tx, order.ID, dellymanQuotes, dellymanBrandOrder, deliveryAddress, req.Delivery.Apt, contactName, req.Contact.Phone); err != nil {
+			if err := createDellymanDeliveryRows(tx, order.ID, dellymanQuotes, dellymanBrandOrder, deliveryAddress, req.Delivery.City, req.Delivery.State, req.Delivery.Country, req.Delivery.Apt, contactName, req.Contact.Phone); err != nil {
 				return err
 			}
 			log.Printf("✅ Dellyman delivery details created for order %s (%d brand(s))", order.DisplayID, len(dellymanBrandOrder))

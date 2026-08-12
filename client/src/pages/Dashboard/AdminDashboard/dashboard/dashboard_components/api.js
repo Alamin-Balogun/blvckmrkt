@@ -123,8 +123,13 @@ export const sendReceiptEmail = (id) => req("POST", `/orders/${id}/send-receipt`
 
 // ✅ Order Payout Management (NEW - grouped with orders)
 export const adminGetPayoutInfo = (orderId) => req("GET", `/orders/${orderId}/payout-info`);
-export const adminInitiatePayout = (orderId, data) => 
+export const adminInitiatePayout = (orderId, data) =>
   req("POST", `/orders/${orderId}/initiate-payout`, data);
+
+// Dellyman final-destination fee — state → exact address leg, negotiated
+// with the courier by hand once a shipment reaches the buyer's state.
+export const adminSetDellymanFinalPrice = (deliveryId, amount) =>
+  req("POST", `/dellyman-deliveries/${deliveryId}/final-price`, {amount});
 
 // ── Payouts (Global payout management) ───────────────────────────────────────
 export const getPayouts = (p = {}) => req("GET", `/payouts?${new URLSearchParams(p)}`);

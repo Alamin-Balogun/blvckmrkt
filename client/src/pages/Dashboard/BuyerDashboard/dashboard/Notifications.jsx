@@ -401,6 +401,33 @@ function NotifDetailModal({notif, onClose, onMarkRead, onDelete}) {
             </div>
           </div>
           <div style={{display: "flex", gap: 10}}>
+            {notif.action_url && (
+              <a
+                href={notif.action_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => !read && onMarkRead(notif)}
+                style={{
+                  flex: 1,
+                  background: "#ef4444",
+                  border: "1px solid #ef4444",
+                  color: "#fff",
+                  fontSize: 11,
+                  fontWeight: 800,
+                  letterSpacing: "0.1em",
+                  textTransform: "uppercase",
+                  padding: "11px 16px",
+                  borderRadius: 9,
+                  cursor: "pointer",
+                  textDecoration: "none",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                }}>
+                {notif.action_label || "Pay Now"} →
+              </a>
+            )}
             {!read && (
               <button
                 onClick={() => {
@@ -842,6 +869,30 @@ export default function Notifications({autoOpenId, onClearOpen}) {
                     </p>
                   </div>
                   <div style={{display: "flex", flexDirection: "column", gap: 6, flexShrink: 0}}>
+                    {n.action_url && (
+                      <a
+                        href={n.action_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => !read && handleMarkOne(n)}
+                        style={{
+                          background: "#ef4444",
+                          border: "1px solid #ef4444",
+                          color: "#fff",
+                          fontSize: 9,
+                          fontWeight: 800,
+                          letterSpacing: "0.1em",
+                          textTransform: "uppercase",
+                          padding: "6px 10px",
+                          borderRadius: 7,
+                          cursor: "pointer",
+                          whiteSpace: "nowrap",
+                          textDecoration: "none",
+                          textAlign: "center",
+                        }}>
+                        {n.action_label || "Pay Now"}
+                      </a>
+                    )}
                     {!read && (
                       <button
                         onClick={() => handleMarkOne(n)}
