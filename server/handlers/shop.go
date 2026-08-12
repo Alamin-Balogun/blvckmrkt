@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"sort"
 	"strconv"
 	"strings"
 
@@ -9,6 +10,23 @@ import (
 	"github.com/Alamin-Balogun/blvckmrkt/utils"
 	"github.com/gin-gonic/gin"
 )
+
+// orderedImageURLs returns a product's photo URLs ordered by Position — used
+// both for the primary/grid thumbnail and for the shop grid's auto-cycling
+// slideshow (which fades through every uploaded photo in order).
+func orderedImageURLs(images []models.ProductImage) []string {
+	if len(images) == 0 {
+		return nil
+	}
+	sorted := make([]models.ProductImage, len(images))
+	copy(sorted, images)
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i].Position < sorted[j].Position })
+	urls := make([]string, len(sorted))
+	for i, img := range sorted {
+		urls[i] = img.URL
+	}
+	return urls
+}
 
 // ── eligibleBrandsSubquery ────────────────────────────────────────────────────
 const eligibleBrandsSubquery = `(
@@ -30,6 +48,7 @@ type ProductSummary struct {
 	BrandID      uint                 `json:"brand_id"`
 	BrandName    string               `json:"brand_name"`
 	PrimaryImage string               `json:"primary_image"`
+	Images       []string             `json:"images,omitempty"`
 	Sizes        []models.ProductSize `json:"sizes,omitempty"`
 	CreatedAt    interface{}          `json:"created_at,omitempty"`
 	IsVault      bool                 `json:"is_vault,omitempty"`
@@ -57,22 +76,17 @@ func fetchProductSummaries(productIDs []uint) map[uint]ProductSummary {
 
 	result := map[uint]ProductSummary{}
 	for _, p := range products {
+		urls := orderedImageURLs(p.Images)
 		primaryImg := ""
-		for _, img := range p.Images {
-			if img.Position == 0 {
-				primaryImg = img.URL
-				break
-			}
-		}
-		if primaryImg == "" && len(p.Images) > 0 {
-			primaryImg = p.Images[0].URL
+		if len(urls) > 0 {
+			primaryImg = urls[0]
 		}
 		result[p.ID] = ProductSummary{
 			ID: p.ID, Name: p.Name, Slug: p.Slug,
 			BrandPrice: p.BrandPrice, Price: p.Price, ComparePrice: p.ComparePrice,
 			Weight: p.Weight,
-			Tags: p.Tags, BrandID: p.BrandID, BrandName: brandMap[p.BrandID],
-			PrimaryImage: primaryImg, Sizes: p.Sizes,
+			Tags:   p.Tags, BrandID: p.BrandID, BrandName: brandMap[p.BrandID],
+			PrimaryImage: primaryImg, Images: urls, Sizes: p.Sizes,
 		}
 	}
 	return result
@@ -175,22 +189,17 @@ func ListProducts(c *gin.Context) {
 			resp[i] = ProductSummary{ID: p.ID, IsVault: true}
 			continue
 		}
+		urls := orderedImageURLs(p.Images)
 		primaryImg := ""
-		for _, img := range p.Images {
-			if img.Position == 0 {
-				primaryImg = img.URL
-				break
-			}
-		}
-		if primaryImg == "" && len(p.Images) > 0 {
-			primaryImg = p.Images[0].URL
+		if len(urls) > 0 {
+			primaryImg = urls[0]
 		}
 		resp[i] = ProductSummary{
 			ID: p.ID, Name: p.Name, Slug: p.Slug,
 			BrandPrice: p.BrandPrice, Price: p.Price, ComparePrice: p.ComparePrice,
 			Weight: p.Weight,
-			Tags: p.Tags, BrandID: p.BrandID, BrandName: brandMap[p.BrandID],
-			PrimaryImage: primaryImg, Sizes: p.Sizes, CreatedAt: p.CreatedAt,
+			Tags:   p.Tags, BrandID: p.BrandID, BrandName: brandMap[p.BrandID],
+			PrimaryImage: primaryImg, Images: urls, Sizes: p.Sizes, CreatedAt: p.CreatedAt,
 		}
 	}
 

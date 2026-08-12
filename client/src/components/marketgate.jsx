@@ -4,10 +4,10 @@ import SpinningLogo from "./SpinningLogo";
 
 const SESSION_FLAG = "blvck_market_gate_shown";
 
-// The access code is deliberately trivial to find — it's the market's own
-// name, printed right above the input. This is a flavor gate (sets the
-// "restricted market" tone before the site loads), not real security.
-const ACCESS_CODE = "BLVCKMRKT";
+// The access code is deliberately trivial to find — spelled out right above
+// the input. This is a flavor gate (sets the "restricted market" tone
+// before the site loads), not real security.
+const ACCESS_CODE = "12345";
 
 // Seconds each boot stage's progress bar takes to fill, once the correct
 // code has been entered — nothing runs before that.
@@ -171,9 +171,9 @@ export default function MarketGate() {
             zIndex: 100000,
             background: "#050000",
             display: "flex",
-            alignItems: "center",
+            alignItems: "flex-start",
             justifyContent: "center",
-            padding: 18,
+            padding: "5vh 18px",
             fontFamily: "'Space Mono', monospace",
             overflowY: "auto",
           }}>
@@ -451,7 +451,7 @@ export default function MarketGate() {
                           }}>
                           {denied
                             ? "ACCESS DENIED — TRY AGAIN"
-                            : "💡 TIP: the code is the name of this market (see above ☝) — BLVCKMRKT"}
+                            : "Sure you want to enter BLVCKMRKT? Enter the code: 12345"}
                         </p>
 
                         <button

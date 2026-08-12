@@ -1,5 +1,28 @@
+import {useState, useEffect} from "react";
 import {Link, useNavigate} from "react-router-dom";
 import {getProductMeta, fmt, isOutOfStock} from "../utils/productMeta";
+
+const SLIDESHOW_INTERVAL_MS = 60000;
+
+// Cycles through every uploaded photo, one per minute, crossfading between
+// them — used for plain image-based products (as opposed to a 3D model).
+function ProductImageSlideshow({images, alt, dimmed}) {
+  const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    if (images.length < 2) return;
+    const t = setInterval(() => setIndex((i) => (i + 1) % images.length), SLIDESHOW_INTERVAL_MS);
+    return () => clearInterval(t);
+  }, [images.length]);
+
+  return (
+    <div className="pg-slideshow" style={dimmed ? {filter: "grayscale(70%)", opacity: 0.55} : undefined}>
+      {images.map((src, i) => (
+        <img key={src} src={src} alt={alt} className={i === index ? "pg-slide active" : "pg-slide"} />
+      ))}
+    </div>
+  );
+}
 
 // Shared "grid card" used on the Shop page, the homepage product sections,
 // and the product detail page's "You May Also Like" row — one visual/
@@ -23,19 +46,18 @@ export default function ProductCard({
   const navigate = useNavigate();
   const {tags, saving, isOnSale, isNew} = getProductMeta(p);
   const outOfStock = isOutOfStock(p);
-  const primaryImg = p.primary_image || p.images?.[0]?.url || "";
+  const primaryImg = p.primary_image || p.images?.[0]?.url || p.images?.[0] || "";
+  const galleryImages = (p.images?.length ? p.images : primaryImg ? [primaryImg] : [])
+    .map((img) => (typeof img === "string" ? img : img?.url))
+    .filter(Boolean);
   const sizes = p.sizes?.map((s) => s.size ?? s.name ?? s) ?? [];
   const href = `/shop/${p.slug || p.id}`;
 
   return (
     <div className="pg-card">
       <div className="pg-card-img" style={{cursor: "pointer"}} onClick={() => navigate(href)}>
-        {primaryImg ? (
-          <img
-            src={primaryImg}
-            alt={p.name}
-            style={outOfStock ? {filter: "grayscale(70%)", opacity: 0.55} : undefined}
-          />
+        {galleryImages.length > 0 ? (
+          <ProductImageSlideshow images={galleryImages} alt={p.name} dimmed={outOfStock} />
         ) : (
           <div
             style={{
@@ -188,8 +210,10 @@ export const PRODUCT_CARD_CSS = `
   .pg-card { background: #0d0d0d; border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; transition: border-color 0.3s, transform 0.3s; }
   .pg-card:hover { border-color: rgba(255,255,255,0.2); transform: translateY(-3px); }
   .pg-card-img { position: relative; aspect-ratio: 3/3.5; overflow: hidden; }
-  .pg-card-img img { width: 100%; height: 100%; object-fit: cover; object-position: top; transition: transform 0.7s; filter: grayscale(15%); }
-  .pg-card:hover .pg-card-img img { transform: scale(1.06); }
+  .pg-slideshow { position: absolute; inset: 0; transition: transform 0.7s; }
+  .pg-card:hover .pg-slideshow { transform: scale(1.06); }
+  .pg-slide { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top; filter: grayscale(15%); opacity: 0; transition: opacity 1.2s ease-in-out; }
+  .pg-slide.active { opacity: 1; }
   .pg-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.15); transition: background 0.4s; }
   .pg-card:hover .pg-overlay { background: rgba(0,0,0,0.05); }
   .pg-badge-area { position: absolute; top: 10px; left: 10px; display: flex; flex-direction: column; gap: 4px; max-width: calc(100% - 52px); }
