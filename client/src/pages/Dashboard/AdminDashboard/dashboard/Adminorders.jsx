@@ -1126,9 +1126,11 @@ function DellymanFinalPriceBox({delivery, onSet, toast}) {
     }
   };
 
+  const isFullPrice = !!delivery.pending_quote;
+
   return (
     <div style={{marginTop: 10, paddingTop: 10, borderTop: "1px dashed rgba(139,92,246,0.2)"}}>
-      <SectionHeader style={{margin: "0 0 6px"}}>Final Destination Fee</SectionHeader>
+      <SectionHeader style={{margin: "0 0 6px"}}>{isFullPrice ? "Courier Price" : "Final Destination Fee"}</SectionHeader>
       {fc ? (
         <div style={{display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 8}}>
           <span style={{color: "rgba(255,255,255,0.6)", fontSize: 12, fontWeight: 700}}>
@@ -1138,7 +1140,9 @@ function DellymanFinalPriceBox({delivery, onSet, toast}) {
         </div>
       ) : (
         <p style={{color: "rgba(255,255,255,0.3)", fontSize: 11, margin: "0 0 8px"}}>
-          Not set yet — buyer hasn't been billed for the final leg to their exact address.
+          {isFullPrice
+            ? "Not set yet — buyer hasn't been billed anything for delivery yet."
+            : "Not set yet — buyer hasn't been billed for the final leg to their exact address."}
         </p>
       )}
       {!paid && (
@@ -1446,8 +1450,8 @@ function OrderDrawer({orderId, onClose, onStatusChange, onPaymentStatusChange, o
                         {d.brand_name || `Brand #${d.brand_id}`}
                       </span>
                       <Badge
-                        label={d.status || "quoted"}
-                        color={{quoted: "#6b7280", booked: "#3b82f6", picked: "#06b6d4", delivered: "#22c55e", cancelled: "#ef4444", failed: "#ef4444"}[d.status] || "#6b7280"}
+                        label={d.pending_quote ? "no rate yet" : (d.status || "quoted")}
+                        color={d.pending_quote ? "#f59e0b" : ({quoted: "#6b7280", booked: "#3b82f6", picked: "#06b6d4", delivered: "#22c55e", cancelled: "#ef4444", failed: "#ef4444"}[d.status] || "#6b7280")}
                       />
                     </div>
                     <SectionHeader style={{margin: "6px 0 2px"}}>Brand</SectionHeader>
@@ -1461,13 +1465,22 @@ function OrderDrawer({orderId, onClose, onStatusChange, onPaymentStatusChange, o
                     {d.delivery_city && <InfoRow label="City" value={d.delivery_city} />}
                     {d.delivery_landmark && <InfoRow label="Landmark" value={d.delivery_landmark} />}
                     <SectionHeader style={{margin: "10px 0 2px"}}>Courier</SectionHeader>
-                    <InfoRow label="Company" value={d.courier_company} />
-                    <InfoRow label="Vehicle" value={d.vehicle} />
-                    <InfoRow label="Price (pickup → state)" value={`${d.currency === "NGN" ? "₦" : d.currency || ""}${Number(d.price || 0).toLocaleString()}`} />
-                    <InfoRow label="Dellyman Order ID" value={d.dellyman_order_id} />
-                    <InfoRow label="Tracking ID" value={d.tracking_id} />
-                    {d.picked_up_at && <InfoRow label="Picked Up" value={fmtDate(d.picked_up_at, true)} />}
-                    {d.delivered_at && <InfoRow label="Delivered" value={fmtDate(d.delivered_at, true)} />}
+                    {d.pending_quote ? (
+                      <p style={{color: "#f59e0b", fontSize: 11, margin: "4px 0 8px", lineHeight: 1.6}}>
+                        Dellyman had no rate for this route at checkout — nothing was charged for delivery yet.
+                        Once you've confirmed a price with them on WhatsApp, enter it below to bill the buyer.
+                      </p>
+                    ) : (
+                      <>
+                        <InfoRow label="Company" value={d.courier_company} />
+                        <InfoRow label="Vehicle" value={d.vehicle} />
+                        <InfoRow label="Price (pickup → state)" value={`${d.currency === "NGN" ? "₦" : d.currency || ""}${Number(d.price || 0).toLocaleString()}`} />
+                        <InfoRow label="Dellyman Order ID" value={d.dellyman_order_id} />
+                        <InfoRow label="Tracking ID" value={d.tracking_id} />
+                        {d.picked_up_at && <InfoRow label="Picked Up" value={fmtDate(d.picked_up_at, true)} />}
+                        {d.delivered_at && <InfoRow label="Delivered" value={fmtDate(d.delivered_at, true)} />}
+                      </>
+                    )}
                     <DellymanFinalPriceBox delivery={d} onSet={handleFinalChargeSet} toast={toast} />
                   </div>
                 ))}

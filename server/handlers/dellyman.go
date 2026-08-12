@@ -92,6 +92,9 @@ type dellymanQuote struct {
 	Pickup  models.Address
 	Brand   models.Brand
 	Company services.QuoteCompany
+	// Pending is true when Dellyman had no rate for this route at all (see
+	// DellymanPendingQuote) — Company is zero-valued in that case.
+	Pending bool
 }
 
 // dellymanPickupAddress finds the brand's designated Dellyman pickup address
@@ -120,9 +123,18 @@ func dellymanPickupAddress(tx *gorm.DB, brandID uint) (models.Brand, models.Addr
 // quoteDellymanForBrands fetches a live Dellyman quote per brand — each
 // brand ships from its own Dellyman pickup address — and picks the cheapest
 // courier for each. brandTotals is the product subtotal per brand;
-// brandOrder gives a stable iteration order. Returns an error naming the
-// first brand that can't be quoted, e.g. because it has no Dellyman pickup
-// address set up yet.
+// brandOrder gives a stable iteration order.
+//
+// Dellyman only has a rate configured for a subset of pickup-state →
+// delivery-state routes on this account (confirmed live: e.g. any pickup
+// state other than Lagos is rejected outright, even delivering into a
+// covered state) — so a brand that can't be quoted is NOT treated as a hard
+// failure here. Per how the brand's arrangement with Dellyman actually
+// works, they still physically deliver; the price gets negotiated with them
+// on WhatsApp once they confirm, and admin sets it via the same
+// final-destination-fee flow used for the state→exact-address leg. Only a
+// genuine setup gap on our own side (no pickup address configured for the
+// brand) still blocks checkout — that's within our control to fix.
 func quoteDellymanForBrands(tx *gorm.DB, brandTotals map[uint]float64, brandOrder []uint, deliveryAddress string) (map[uint]dellymanQuote, float64, error) {
 	quotes := make(map[uint]dellymanQuote, len(brandOrder))
 	var total float64
@@ -146,11 +158,14 @@ func quoteDellymanForBrands(tx *gorm.DB, brandTotals map[uint]float64, brandOrde
 			IsProductOrder: intPtr(0),
 		})
 		if err != nil {
-			log.Printf("⚠️ Dellyman quote failed for brand %d: %v", brandID, err)
-			return nil, 0, fmt.Errorf("delivery pricing is temporarily unavailable, please try again shortly")
+			log.Printf("⚠️ Dellyman quote request failed for brand %d, leaving price pending: %v", brandID, err)
+			quotes[brandID] = dellymanQuote{Pickup: pickup, Brand: brand, Pending: true}
+			continue
 		}
 		if len(resp.Companies) == 0 {
-			return nil, 0, fmt.Errorf("our courier can't deliver to this address yet — please try a location closer to a major city, or choose self-pickup if the brand offers it")
+			log.Printf("ℹ️ Dellyman has no rate yet for brand %d's route to %q, leaving price pending", brandID, deliveryAddress)
+			quotes[brandID] = dellymanQuote{Pickup: pickup, Brand: brand, Pending: true}
+			continue
 		}
 
 		cheapest := resp.Companies[0]
@@ -177,6 +192,10 @@ func createDellymanDeliveryRows(tx *gorm.DB, orderID uint, quotes map[uint]delly
 		if !ok {
 			continue
 		}
+		status := models.DellymanQuoted
+		if q.Pending {
+			status = models.DellymanPendingQuote
+		}
 		row := models.OrderDellymanDelivery{
 			OrderID:              orderID,
 			BrandID:              brandID,
@@ -194,7 +213,7 @@ func createDellymanDeliveryRows(tx *gorm.DB, orderID uint, quotes map[uint]delly
 			Price:                q.Company.TotalPrice,
 			Currency:             "NGN",
 			OrderRef:             uuid.NewString(),
-			Status:               models.DellymanQuoted,
+			Status:               status,
 		}
 		if err := tx.Create(&row).Error; err != nil {
 			return fmt.Errorf("failed to save delivery booking for brand %d: %w", brandID, err)
@@ -675,6 +694,10 @@ type checkoutDellymanBrandQuote struct {
 	BrandName string  `json:"brand_name"`
 	Price     float64 `json:"price"`
 	Company   string  `json:"company"`
+	// Pending is true when Dellyman has no rate for this route yet — the
+	// buyer can still check out, the real price is set later via the
+	// final-destination-fee flow once negotiated with the courier.
+	Pending bool `json:"pending"`
 }
 
 // CheckoutDellymanQuote is POST /api/checkout/dellyman-quote — a live
@@ -736,6 +759,7 @@ func CheckoutDellymanQuote(c *gin.Context) {
 			BrandName: brandNames[brandID],
 			Price:     q.Company.TotalPrice,
 			Company:   q.Company.Name,
+			Pending:   q.Pending,
 		})
 	}
 

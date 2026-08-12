@@ -510,6 +510,7 @@ func buildAdminDellymanDetails(rows []models.OrderDellymanDelivery) []gin.H {
 			"dellyman_order_id":      r.DellymanOrderID,
 			"tracking_id":            r.TrackingID,
 			"status":                 r.Status,
+			"pending_quote":          r.Status == models.DellymanPendingQuote,
 			"picked_up_at":           r.PickedUpAt,
 			"delivered_at":           r.DeliveredAt,
 		}

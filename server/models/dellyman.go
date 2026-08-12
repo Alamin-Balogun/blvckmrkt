@@ -7,12 +7,21 @@ import "time"
 type DellymanShipmentStatus string
 
 const (
-	DellymanQuoted    DellymanShipmentStatus = "quoted" // quote obtained, order not yet booked
-	DellymanBooked    DellymanShipmentStatus = "booked" // BookOrder succeeded, awaiting pickup
-	DellymanPicked    DellymanShipmentStatus = "picked" // rider picked up the package (in transit)
-	DellymanDelivered DellymanShipmentStatus = "delivered"
-	DellymanCancelled DellymanShipmentStatus = "cancelled"
-	DellymanFailed    DellymanShipmentStatus = "failed" // booking attempt errored
+	// DellymanPendingQuote is used when Dellyman's live API had no rate for
+	// this pickup-state → delivery-state route at all (not every state pair
+	// is covered on our account yet). The brand still ships the item
+	// physically and the price gets negotiated with Dellyman on WhatsApp
+	// once they confirm — admin then sets it via the same final-destination
+	// fee flow used for the state→exact-address leg (see DellymanFinalCharge).
+	// Deliberately excluded from bookDellymanShipmentsForOrder's query,
+	// since there's no CompanyID yet to book against.
+	DellymanPendingQuote DellymanShipmentStatus = "pending_quote"
+	DellymanQuoted       DellymanShipmentStatus = "quoted" // quote obtained, order not yet booked
+	DellymanBooked       DellymanShipmentStatus = "booked" // BookOrder succeeded, awaiting pickup
+	DellymanPicked       DellymanShipmentStatus = "picked" // rider picked up the package (in transit)
+	DellymanDelivered    DellymanShipmentStatus = "delivered"
+	DellymanCancelled    DellymanShipmentStatus = "cancelled"
+	DellymanFailed       DellymanShipmentStatus = "failed" // booking attempt errored
 )
 
 // OrderDellymanDelivery is a per-brand snapshot of a Dellyman courier booking

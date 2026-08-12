@@ -185,6 +185,12 @@ function BrandShippingPanel({brand, brandId, items, onSelect, selected, fmtMoney
     if (selected.type === "dellyman" && !selected.destinationState) {
       return {text: selected.name, type: selected.type, price: "Pending"};
     }
+    // Dellyman had no rate for this route at all — still don't show "FREE";
+    // the real price is confirmed with the buyer later (see
+    // AdminSetDellymanFinalPrice) once negotiated with the courier.
+    if (selected.type === "dellyman" && selected.pendingQuote) {
+      return {text: selected.name, type: selected.type, price: "To be confirmed"};
+    }
     const rawPrice = Number(selected.flat_rate ?? selected.base_price ?? selected.rate ?? 0);
     const selCur = (selected._currency || selected.currency_code || selected.currency || baseCurrency || "NGN").toUpperCase();
     return {
@@ -763,6 +769,7 @@ export default function CartGrid() {
               flat_rate: b.price,
               company: b.company,
               destinationState,
+              pendingQuote: !!b.pending,
             };
           }
           return next;
@@ -1062,6 +1069,11 @@ export default function CartGrid() {
                   ) : destinationQuote.error ? (
                     <p style={{color: "#ef4444", fontSize: 11, margin: "10px 0 0", lineHeight: 1.6}}>
                       {destinationQuote.error}
+                    </p>
+                  ) : destinationState && destinationQuote.breakdown.some((b) => b.pending) ? (
+                    <p style={{color: "#ffc107", fontSize: 11, margin: "10px 0 0", lineHeight: 1.6}}>
+                      Our courier doesn't have a live price to {destinationState} for some items yet — you can
+                      still check out. We'll confirm the courier price once it's arranged.
                     </p>
                   ) : destinationState ? (
                     <p style={{color: "rgba(255,255,255,0.4)", fontSize: 11, margin: "10px 0 0", lineHeight: 1.6}}>

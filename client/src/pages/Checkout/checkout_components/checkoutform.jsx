@@ -2186,9 +2186,17 @@ if (!delivery.country_code && geoLoaded) {
                           ) : dellymanQuote.error ? (
                             <p style={{color: "#ef4444", fontSize: 11, margin: 0}}>{dellymanQuote.error}</p>
                           ) : delivery.city.trim() && delivery.country_name ? (
-                            <p style={{color: "rgba(255,255,255,0.5)", fontSize: 11, margin: 0}}>
-                              {fmtMoney(convert(dellymanQuote.total, baseCurrency))} to {[delivery.city, delivery.state_name].filter(Boolean).join(", ")}
-                            </p>
+                            dellymanQuote.breakdown?.some((b) => b.pending) ? (
+                              <p style={{color: "#ffc107", fontSize: 11, margin: 0, lineHeight: 1.6}}>
+                                Our courier doesn't have a live price for this address yet — you can still place
+                                your order. We'll confirm the courier price with you (via notification and email)
+                                once it's arranged.
+                              </p>
+                            ) : (
+                              <p style={{color: "rgba(255,255,255,0.5)", fontSize: 11, margin: 0}}>
+                                {fmtMoney(convert(dellymanQuote.total, baseCurrency))} to {[delivery.city, delivery.state_name].filter(Boolean).join(", ")}
+                              </p>
+                            )
                           ) : (
                             <p style={{color: "rgba(255,255,255,0.4)", fontSize: 11, margin: 0}}>
                               Priced live once your address below is filled in.
